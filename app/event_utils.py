@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import dataclass
 from datetime import date, datetime, time
 
@@ -16,6 +17,20 @@ VALID_WEEKDAY_VALUES = {str(index) for index in range(7)}
 
 class ValidationError(ValueError):
     """Raised when submitted event data is invalid."""
+
+
+@dataclass
+class EventMonthScope:
+    year: int
+    month: int
+
+    @property
+    def start(self) -> date:
+        return date(self.year, self.month, 1)
+
+    @property
+    def end(self) -> date:
+        return date(self.year, self.month, calendar.monthrange(self.year, self.month)[1])
 
 
 @dataclass
@@ -62,7 +77,16 @@ def sanitize_optional_text(raw_value: str | None, *, max_length: int) -> str | N
     return value
 
 
+def parse_month_scope(form: ImmutableMultiDict[str, str]) -> EventMonthScope:
+    year = form.get('return_year', type=int)
+    month = form.get('return_month', type=int)
+    if year is None or month is None or not 1 <= month <= 12:
+        raise ValidationError('Choose a valid calendar month before saving an event.')
+    return EventMonthScope(year=year, month=month)
+
+
 def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
+    month_scope = parse_month_scope(form)
     title = (form.get('title') or '').strip()
     start_date = parse_iso_date(form.get('start_date'), 'Start date')
     end_date = parse_iso_date(form.get('end_date'), 'End date')
@@ -85,7 +109,7 @@ def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
         recurrence_weekdays=','.join(selected_weekdays) if recurrence_type == 'weekly' else '',
         labels=parse_day_labels(form),
     )
-    validate_event_payload(payload, raw_weekday_count=len(form.getlist('recurrence_weekdays')))
+    validate_event_payload(payload, month_scope, raw_weekday_count=len(form.getlist('recurrence_weekdays')))
     return payload
 
 
@@ -107,13 +131,17 @@ def parse_day_labels(form: ImmutableMultiDict[str, str]) -> dict[int, str]:
     return labels
 
 
-def validate_event_payload(payload: EventPayload, *, raw_weekday_count: int) -> None:
+def validate_event_payload(payload: EventPayload, month_scope: EventMonthScope, *, raw_weekday_count: int) -> None:
     if not payload.title:
         raise ValidationError('Title is required.')
     if len(payload.title) > MAX_TITLE_LENGTH:
         raise ValidationError(f'Title cannot exceed {MAX_TITLE_LENGTH} characters.')
     if payload.end_date < payload.start_date:
         raise ValidationError('End date cannot be before start date.')
+    if payload.start_date < month_scope.start or payload.start_date > month_scope.end:
+        raise ValidationError('Events must start within the selected month.')
+    if payload.end_date < month_scope.start or payload.end_date > month_scope.end:
+        raise ValidationError('Events must end within the selected month.')
     if payload.audience not in AUDIENCE_CHOICES:
         raise ValidationError('Choose a valid audience.')
     if payload.recurrence_type not in RECURRENCE_CHOICES:

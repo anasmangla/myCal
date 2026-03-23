@@ -72,7 +72,13 @@ body {
 }
 
 .calendar-cell.outside-month {
-  opacity: 0.55;
+  background: #f8fafc;
+  padding: 0;
+}
+
+.outside-month-fill {
+  min-height: 100%;
+  width: 100%;
 }
 
 .calendar-cell-header {
@@ -127,13 +133,9 @@ body {
   overflow: hidden;
 }
 
-.selected-week .calendar-cell {
+.selected-week .calendar-cell[data-in-month="true"] {
   outline: 3px solid #2563eb;
   outline-offset: -3px;
-}
-
-.week-picker-wrap {
-  min-width: min(100%, 380px);
 }
 
 .exporting-calendar .no-print {
@@ -150,9 +152,19 @@ body {
   }
 }
 
+@page {
+  size: landscape;
+  margin: 0.45in;
+}
+
 @media print {
   body {
     background: white;
+  }
+
+  .app-shell {
+    max-width: none;
+    width: 100%;
   }
 
   .no-print {
@@ -166,12 +178,12 @@ body {
     background: white;
   }
 
-  .calendar-cell {
-    min-height: 140px;
-    break-inside: avoid;
+  .calendar-card {
+    width: 100%;
   }
 
-  body.print-week .week-row:not(.selected-week) {
-    display: none;
+  .calendar-cell {
+    min-height: 115px;
+    break-inside: avoid;
   }
 }

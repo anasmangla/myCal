@@ -32,16 +32,12 @@
       <div class="toolbar-panel no-print mb-3">
         <div class="d-flex flex-column flex-xl-row gap-3 justify-content-between align-items-xl-center">
           <div class="d-flex flex-wrap gap-2 action-bar">
-            <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print month</button>
-            <button class="btn btn-outline-primary btn-sm" data-print-mode="week">Print selected week</button>
+            <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print / Save PDF</button>
             <button class="btn btn-outline-secondary btn-sm" id="exportImageBtn">Export image</button>
             <button class="btn btn-outline-dark btn-sm" id="clearStorageBtn">Reset saved data</button>
           </div>
-          <div class="week-picker-wrap d-flex flex-column flex-md-row gap-2 align-items-md-center">
-            <label class="form-label mb-0 fw-semibold" for="weekPrintSelect">Week to print</label>
-            <select class="form-select form-select-sm" id="weekPrintSelect" aria-label="Week to print"></select>
-            <span class="text-muted small">Choose a visible month row before using week print mode.</span>
-          </div>
+          <div class="text-muted small">Double-click any date in this month to add an event. Printing and image exports use landscape layout.</div>
+          <select class="d-none" id="weekPrintSelect" aria-hidden="true"></select>
         </div>
       </div>
 
@@ -51,7 +47,7 @@
         <div class="card-body p-0">
           <div class="calendar-title text-center py-3 border-bottom">
             <h2 class="h4 mb-1" id="calendarTitle"></h2>
-            <p class="small text-muted mb-0">Click a week row to highlight it, left-click an event to edit it, or right-click for quick actions.</p>
+            <p class="small text-muted mb-0">Double-click a date to add an event, left-click an event to edit it, or right-click an in-month date for quick actions.</p>
           </div>
           <div class="calendar-grid-wrapper">
             <div class="calendar-grid weekdays" id="weekdayHeader"></div>

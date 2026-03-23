@@ -284,8 +284,8 @@ function renderCalendar() {
   document.getElementById('calendarTitle').textContent = `${MONTH_NAMES[view.month - 1]} ${view.year}`;
 
   const grid = buildMonthGrid(view.year, view.month);
-  const visibleStart = isoDate(grid[0][0]);
-  const visibleEnd = isoDate(grid[grid.length - 1][6]);
+  const visibleStart = isoDate(new Date(Date.UTC(view.year, view.month - 1, 1)));
+  const visibleEnd = isoDate(new Date(Date.UTC(view.year, view.month, 0)));
   const holidayMap = state.includeHolidays !== false ? getUSHolidays(view.year, view.month) : new Map();
   const longWeekends = state.includeHolidays !== false ? detectLongWeekends(holidayMap) : new Set();
   const occurrences = getVisibleEvents(visibleStart, visibleEnd);
@@ -296,18 +296,8 @@ function renderCalendar() {
 
   const body = document.getElementById('calendarBody');
   body.innerHTML = '';
-  const weekSelect = document.getElementById('weekPrintSelect');
-  weekSelect.innerHTML = '';
 
   grid.forEach((week, weekIndex) => {
-    const inMonthDays = week.filter((day) => day.getUTCMonth() === view.month - 1);
-    const labelStart = inMonthDays[0] || week[0];
-    const labelEnd = inMonthDays[inMonthDays.length - 1] || week[6];
-    const option = document.createElement('option');
-    option.value = String(weekIndex);
-    option.textContent = `Week ${weekIndex + 1} · ${labelStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${labelEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`;
-    weekSelect.appendChild(option);
-
     const row = document.createElement('div');
     row.className = `calendar-grid week-row ${weekIndex === view.selectedWeekIndex ? 'selected-week' : ''}`;
     row.dataset.weekIndex = String(weekIndex);
@@ -317,36 +307,41 @@ function renderCalendar() {
       const key = isoDate(day);
       const cell = document.createElement('div');
       cell.className = 'calendar-cell';
+      const inMonth = day.getUTCMonth() === view.month - 1;
       if (day.getUTCDay() === 0 || day.getUTCDay() === 6) cell.classList.add('weekend');
-      if (day.getUTCMonth() !== view.month - 1) cell.classList.add('outside-month');
+      if (!inMonth) cell.classList.add('outside-month');
       if (holidayMap.has(key)) cell.classList.add('holiday');
       if (longWeekends.has(key)) cell.classList.add('long-weekend');
       if (state.styles[key]) cell.style.background = state.styles[key];
       cell.dataset.date = key;
-      cell.addEventListener('contextmenu', (event) => {
-        event.preventDefault();
-        activeDate = key;
-        showMenu(document.getElementById('dateContextMenu'), event.pageX, event.pageY);
-      });
+      cell.dataset.inMonth = inMonth ? 'true' : 'false';
+      if (inMonth) {
+        cell.addEventListener('dblclick', () => openEventModal({ start_date: key, end_date: key }));
+        cell.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          activeDate = key;
+          showMenu(document.getElementById('dateContextMenu'), event.pageX, event.pageY);
+        });
+      }
 
       const holidayText = holidayMap.get(key) || '';
-      cell.innerHTML = `
+      cell.innerHTML = inMonth ? `
         <div class="calendar-cell-header">
           <button type="button" class="btn btn-sm btn-light date-action-btn no-print" aria-label="Date actions">⋮</button>
           <div><div class="day-number">${day.getUTCDate()}</div></div>
         </div>
         <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''}">${holidayText}</div>
         <div class="event-list"></div>
-        <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2 no-print quick-add-btn">+ Add</button>
-      `;
+      ` : '<div class="outside-month-fill" aria-hidden="true"></div>';
 
-      cell.querySelector('.quick-add-btn').addEventListener('click', () => openEventModal({ start_date: key, end_date: key }));
-      cell.querySelector('.date-action-btn').addEventListener('click', () => openEventModal({ start_date: key, end_date: key }));
-      cell.querySelector('.date-action-btn').addEventListener('contextmenu', (event) => {
-        event.preventDefault();
-        activeDate = key;
-        showMenu(document.getElementById('dateContextMenu'), event.pageX, event.pageY);
-      });
+      if (inMonth) {
+        cell.querySelector('.date-action-btn').addEventListener('click', () => openEventModal({ start_date: key, end_date: key }));
+        cell.querySelector('.date-action-btn').addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          activeDate = key;
+          showMenu(document.getElementById('dateContextMenu'), event.pageX, event.pageY);
+        });
+      }
 
       const list = cell.querySelector('.event-list');
       (occurrences[key] || []).forEach((item) => {
@@ -377,13 +372,11 @@ function renderCalendar() {
     body.appendChild(row);
   });
 
-  weekSelect.value = String(view.selectedWeekIndex);
 }
 
 function setSelectedWeek(index) {
   view.selectedWeekIndex = Number(index);
   document.querySelectorAll('.week-row').forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(view.selectedWeekIndex)));
-  document.getElementById('weekPrintSelect').value = String(view.selectedWeekIndex);
 }
 
 function openEventModal(payload) {
@@ -404,6 +397,7 @@ function openEventModal(payload) {
     checkbox.checked = (payload.recurrence_weekdays || '').split(',').includes(checkbox.value);
   });
   document.getElementById('deleteEventBtn').classList.toggle('d-none', !payload.id);
+  syncRecurringEndDate(Boolean(payload.id));
   syncAllDayState();
   toggleWeeklyOptions();
   buildDayLabels(payload.labels || {});
@@ -438,6 +432,25 @@ function collectLabels() {
     if (value) labels[input.name.replace('label_', '')] = value;
   });
   return labels;
+}
+
+function currentMonthBounds() {
+  const monthText = String(view.month).padStart(2, '0');
+  const lastDay = new Date(Date.UTC(view.year, view.month, 0)).getUTCDate();
+  return { start: `${view.year}-${monthText}-01`, end: `${view.year}-${monthText}-${String(lastDay).padStart(2, '0')}` };
+}
+
+function syncRecurringEndDate(preserveExistingRange = false) {
+  const recurrenceType = document.getElementById('recurrenceType').value;
+  const startInput = document.getElementById('startDate');
+  const endInput = document.getElementById('endDate');
+  const { start, end } = currentMonthBounds();
+  [startInput, endInput].forEach((input) => { input.min = start; input.max = end; });
+  if (recurrenceType !== 'none' && startInput.value) {
+    if (!preserveExistingRange || !endInput.value || endInput.value < startInput.value) endInput.value = end;
+  } else if (startInput.value && (!endInput.value || endInput.value < startInput.value)) {
+    endInput.value = startInput.value;
+  }
 }
 
 function syncAllDayState() {
@@ -477,6 +490,8 @@ function validateEventForm() {
 
   if (!title) return 'Please enter an event title.';
   if (!startDate || !endDate) return 'Please choose both a start date and an end date.';
+  const { start: monthStart, end: monthEnd } = currentMonthBounds();
+  if (startDate < monthStart || startDate > monthEnd || endDate < monthStart || endDate > monthEnd) return 'Events must stay within the selected month.';
   const span = getSpanDays(startDate, endDate);
   if (!Number.isFinite(span)) return 'Please choose valid event dates.';
   if (span < 1) return 'End date cannot be before start date.';
@@ -555,17 +570,13 @@ function bindUI() {
     saveState();
     renderCalendar();
   });
-  document.getElementById('weekPrintSelect').addEventListener('change', (event) => setSelectedWeek(event.target.value));
-  document.querySelectorAll('[data-print-mode]').forEach((button) => button.addEventListener('click', () => {
-    document.body.classList.toggle('print-week', button.dataset.printMode === 'week');
-    window.print();
-  }));
-  window.addEventListener('afterprint', () => document.body.classList.remove('print-week'));
+  document.querySelectorAll('[data-print-mode]').forEach((button) => button.addEventListener('click', () => window.print()));
   document.getElementById('exportImageBtn').addEventListener('click', async () => {
     try {
       document.body.classList.add('exporting-calendar');
       const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
-      const canvas = await html2canvas(document.getElementById('calendarCapture'), { backgroundColor: '#ffffff', scale: Math.max(window.devicePixelRatio || 1, 2), useCORS: true, logging: false });
+      const calendarNode = document.getElementById('calendarCapture');
+      const canvas = await html2canvas(calendarNode, { backgroundColor: '#ffffff', scale: Math.max(window.devicePixelRatio || 1, 2), useCORS: true, logging: false, width: calendarNode.scrollWidth, height: calendarNode.scrollHeight, windowWidth: Math.max(document.documentElement.clientWidth, 1600) });
       const link = document.createElement('a');
       link.download = `calendar-${view.year}-${String(view.month).padStart(2, '0')}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -589,10 +600,12 @@ function bindUI() {
 
   document.getElementById('allDay').addEventListener('change', syncAllDayState);
   document.getElementById('recurrenceType').addEventListener('change', () => {
+    syncRecurringEndDate();
     toggleWeeklyOptions();
     buildDayLabels();
   });
-  ['title', 'startDate', 'endDate'].forEach((id) => document.getElementById(id).addEventListener('input', () => buildDayLabels(collectLabels())));
+  document.getElementById('startDate').addEventListener('change', () => { syncRecurringEndDate(); buildDayLabels(collectLabels()); });
+  ['title', 'endDate'].forEach((id) => document.getElementById(id).addEventListener('input', () => buildDayLabels(collectLabels())));
   document.getElementById('eventForm').addEventListener('submit', saveEvent);
   document.getElementById('deleteEventBtn').addEventListener('click', () => {
     const id = Number(document.getElementById('eventId').value);
@@ -601,6 +614,8 @@ function bindUI() {
       eventModal.hide();
     }
   });
+
+  syncRecurringEndDate();
 
   document.getElementById('contextAddEvent').addEventListener('click', () => {
     hideMenus();
