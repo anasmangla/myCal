@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'mycal.static.state.v1';
+const TITLE_STORAGE_PREFIX = 'mycal.static.title';
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -278,10 +279,68 @@ function initOptions() {
   document.getElementById('holidaysToggle').checked = state.includeHolidays !== false;
 }
 
+function defaultCalendarTitle() {
+  return `${MONTH_NAMES[view.month - 1]} ${view.year} - Ahmadiyya Muslim Jamaat Buffalo`;
+}
+
+function calendarTitleStorageKey() {
+  return `${TITLE_STORAGE_PREFIX}.${view.year}-${String(view.month).padStart(2, '0')}`;
+}
+
+function syncCalendarTitle(value) {
+  const nextValue = value.trim() || defaultCalendarTitle();
+  const display = document.getElementById('calendarTitle');
+  const input = document.getElementById('calendarTitleInput');
+  display.textContent = nextValue;
+  input.value = nextValue;
+  return nextValue;
+}
+
+function setupCalendarTitleEditor() {
+  const display = document.getElementById('calendarTitle');
+  const input = document.getElementById('calendarTitleInput');
+  const startEditing = () => {
+    display.classList.add('d-none');
+    input.classList.remove('d-none');
+    input.focus();
+    input.select();
+  };
+  const stopEditing = (save = true) => {
+    if (save) {
+      const nextValue = syncCalendarTitle(input.value);
+      localStorage.setItem(calendarTitleStorageKey(), nextValue);
+    } else {
+      input.value = display.textContent;
+    }
+    input.classList.add('d-none');
+    display.classList.remove('d-none');
+  };
+
+  display.addEventListener('click', startEditing);
+  display.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      startEditing();
+    }
+  });
+  input.addEventListener('blur', () => stopEditing(true));
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      stopEditing(true);
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      stopEditing(false);
+      display.focus();
+    }
+  });
+}
+
 function renderCalendar() {
   document.getElementById('monthSelect').value = String(view.month);
   document.getElementById('yearSelect').value = String(view.year);
-  document.getElementById('calendarTitle').textContent = `${MONTH_NAMES[view.month - 1]} ${view.year}`;
+  syncCalendarTitle(localStorage.getItem(calendarTitleStorageKey()) || defaultCalendarTitle());
 
   const grid = buildMonthGrid(view.year, view.month);
   const visibleStart = isoDate(new Date(Date.UTC(view.year, view.month - 1, 1)));
@@ -661,6 +720,7 @@ function bindUI() {
 document.addEventListener('DOMContentLoaded', () => {
   initOptions();
   eventModal = new bootstrap.Modal(document.getElementById('eventModal'));
+  setupCalendarTitleEditor();
   bindUI();
   renderCalendar();
 });

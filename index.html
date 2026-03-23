@@ -46,8 +46,11 @@
       <div class="card shadow-sm calendar-card" id="calendarCapture">
         <div class="card-body p-0">
           <div class="calendar-title text-center py-3 border-bottom">
-            <h2 class="h4 mb-1" id="calendarTitle"></h2>
-            <p class="small text-muted mb-0">Double-click a date to add an event, left-click an event to edit it, or right-click an in-month date for quick actions.</p>
+            <div class="calendar-title-editor">
+              <h2 class="h4 mb-1" id="calendarTitle" tabindex="0" role="button" aria-label="Edit calendar title"></h2>
+              <input type="text" class="form-control form-control-sm d-none" id="calendarTitleInput" maxlength="200" aria-label="Calendar title">
+            </div>
+            <p class="small text-muted mb-0 no-print">Double-click a date to add an event, left-click an event to edit it, or right-click an in-month date for quick actions.</p>
           </div>
           <div class="calendar-grid-wrapper">
             <div class="calendar-grid weekdays" id="weekdayHeader"></div>

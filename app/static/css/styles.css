@@ -32,6 +32,36 @@ body {
   overflow: hidden;
 }
 
+.calendar-title-editor {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: min(100%, 720px);
+  margin: 0 auto 0.25rem;
+}
+
+.calendar-title-editor .h4,
+.calendar-title-editor .form-control {
+  margin-bottom: 0;
+}
+
+.calendar-title-editor .h4 {
+  cursor: text;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.calendar-title-editor .h4:hover,
+.calendar-title-editor .h4:focus-visible {
+  background: rgba(37, 99, 235, 0.08);
+  outline: none;
+}
+
+.calendar-title-editor .form-control {
+  text-align: center;
+  font-weight: 600;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
