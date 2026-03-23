@@ -26,6 +26,7 @@ def index():
     year = request.args.get('year', default=default_year, type=int)
     month = request.args.get('month', default=default_month, type=int)
     include_holidays = request.args.get('holidays', '1') == '1'
+    include_islamic = request.args.get('islamic', '0') == '1'
     context = month_context(year, month, include_holidays)
     years = list(range(default_year - 3, default_year + 8))
     return render_template(
@@ -35,6 +36,7 @@ def index():
         years=years,
         month_names=MONTH_NAMES,
         include_holidays=include_holidays,
+        include_islamic=include_islamic,
         audience_choices=AUDIENCE_CHOICES,
         recurrence_choices=RECURRENCE_CHOICES,
         weekday_choices=WEEKDAY_CHOICES,
@@ -172,4 +174,5 @@ def _return_url():
     year = request.form.get('return_year')
     month = request.form.get('return_month')
     holidays = request.form.get('return_holidays', '1')
-    return url_for('calendar.index', year=year, month=month, holidays=holidays)
+    islamic = request.form.get('return_islamic', '0')
+    return url_for('calendar.index', year=year, month=month, holidays=holidays, islamic=islamic)

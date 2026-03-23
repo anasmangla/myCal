@@ -20,6 +20,7 @@
         selectedMonth: {{ selected_month }},
         selectedYear: {{ selected_year }},
         includeHolidays: {{ 'true' if include_holidays else 'false' }},
+        includeIslamic: {{ 'true' if include_islamic else 'false' }},
       };
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
