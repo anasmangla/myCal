@@ -149,8 +149,8 @@ function formatTime(value) {
 }
 
 function formatOccurrenceDisplay(label, startTime, location, allDay) {
-  const prefix = allDay || !startTime ? 'All Day' : formatTime(startTime);
-  return `${prefix} ${label}${location ? ` @ ${location}` : ''}`;
+  const prefix = allDay || !startTime ? '' : `${formatTime(startTime)} `;
+  return `${prefix}${label}${location ? ` @ ${location}` : ''}`;
 }
 
 function getSpanDays(startDate, endDate) {
@@ -291,7 +291,7 @@ function renderCalendar() {
   const occurrences = getVisibleEvents(visibleStart, visibleEnd);
   holidayMap.forEach((name, key) => {
     occurrences[key] ||= [];
-    occurrences[key].unshift({ source_event_id: null, display_text: `All Day ${name}`, title: name, location: null, notes: 'U.S. federal holiday', is_holiday: true, all_day: true, color: '#7c3aed' });
+    occurrences[key].unshift({ source_event_id: null, display_text: name, title: name, location: null, notes: 'U.S. federal holiday', is_holiday: true, all_day: true, color: '#7c3aed' });
   });
 
   const body = document.getElementById('calendarBody');

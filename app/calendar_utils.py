@@ -119,8 +119,8 @@ def format_time(value: time | None) -> str | None:
 
 
 def format_occurrence_display(label: str, start_time: time | None, location: str | None, all_day: bool) -> str:
-    prefix = 'All Day' if all_day or start_time is None else format_time(start_time)
-    return f'{prefix} {label}' + (f' @ {location}' if location else '')
+    prefix = f'{format_time(start_time)} ' if not all_day and start_time is not None else ''
+    return f'{prefix}{label}' + (f' @ {location}' if location else '')
 
 
 def event_label_map(event: Event) -> dict[int, str]:
@@ -208,7 +208,7 @@ def holiday_occurrence(holiday_day: date, name: str) -> Occurrence:
         date=holiday_day,
         title=name,
         label=name,
-        display_text=f'All Day {name}',
+        display_text=name,
         start_time=None,
         end_time=None,
         all_day=True,
