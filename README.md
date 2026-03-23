@@ -20,6 +20,7 @@ myCal/
 ├── app/
 │   ├── __init__.py
 │   ├── calendar_utils.py
+│   ├── event_utils.py
 │   ├── models.py
 │   ├── routes.py
 │   ├── static/

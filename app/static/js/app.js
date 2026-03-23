@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
   const deleteForm = document.getElementById('deleteEventForm');
+  const weekPrintSelect = document.getElementById('weekPrintSelect');
   let activeDate = null;
   let activeEventId = null;
 
@@ -17,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupWeekSelection();
   setupPrintButtons();
   setupExportImage();
+  setupContextMenus();
+  setupFormBehavior();
 
   document.querySelectorAll('.quick-add-btn, .date-action-btn').forEach((button) => {
     button.addEventListener('click', () => {
@@ -50,52 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('contextClearColor').addEventListener('click', async () => {
     hideMenus();
-    await fetch('/date-style/clear', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ day: activeDate }),
-    });
-    window.location.reload();
+    const result = await saveDateStyle('/date-style/clear', { day: activeDate });
+    if (result.ok) window.location.reload();
   });
 
   colorPicker.addEventListener('input', async () => {
-    await fetch('/date-style', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ day: activeDate, background_color: colorPicker.value }),
-    });
-    window.location.reload();
+    const result = await saveDateStyle('/date-style', { day: activeDate, background_color: colorPicker.value });
+    if (result.ok) window.location.reload();
   });
 
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();
     deleteForm.action = `/events/delete/${activeEventId}`;
     deleteForm.submit();
-  });
-
-  document.addEventListener('click', hideMenus);
-  document.getElementById('recurrenceType').addEventListener('change', toggleWeeklyOptions);
-  document.getElementById('allDay').addEventListener('change', syncAllDayState);
-  document.getElementById('startDate').addEventListener('change', buildDayLabels);
-  document.getElementById('endDate').addEventListener('change', buildDayLabels);
-
-  eventForm.addEventListener('submit', (event) => {
-    const startDate = new Date(document.getElementById('startDate').value);
-    const endDate = new Date(document.getElementById('endDate').value);
-    const recurrenceType = document.getElementById('recurrenceType').value;
-    const spanDays = ((endDate - startDate) / 86400000) + 1;
-    validationEl.classList.add('d-none');
-    if (endDate < startDate) {
-      event.preventDefault();
-      validationEl.textContent = 'End date cannot be before start date.';
-      validationEl.classList.remove('d-none');
-      return;
-    }
-    if (recurrenceType === 'none' && spanDays > 10) {
-      event.preventDefault();
-      validationEl.textContent = 'Multi-day events cannot exceed 10 days.';
-      validationEl.classList.remove('d-none');
-    }
   });
 
   function renderEvents() {
@@ -109,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.textContent = item.display_text;
         chip.style.backgroundColor = item.color;
         chip.href = '#';
+        chip.title = [item.title, item.location, item.notes].filter(Boolean).join(' • ');
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
@@ -140,35 +111,101 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const holidayPill = cell.querySelector('.holiday-pill');
       holidayPill.textContent = data.holidays[iso] || '';
+      holidayPill.classList.toggle('holiday-pill-long', Boolean(data.longWeekends.includes(iso)));
     });
   }
 
   function setupWeekSelection() {
-    document.querySelectorAll('.week-row').forEach((row) => {
-      row.addEventListener('click', () => {
-        document.querySelectorAll('.week-row').forEach((week) => week.classList.remove('selected-week'));
-        row.classList.add('selected-week');
-      });
+    const rows = Array.from(document.querySelectorAll('.week-row'));
+    const setSelectedWeek = (weekIndex) => {
+      rows.forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(weekIndex)));
+      if (weekPrintSelect) weekPrintSelect.value = String(weekIndex);
+    };
+
+    rows.forEach((row) => {
+      row.addEventListener('click', () => setSelectedWeek(row.dataset.weekIndex));
     });
+
+    if (weekPrintSelect) {
+      weekPrintSelect.addEventListener('change', () => setSelectedWeek(weekPrintSelect.value));
+      setSelectedWeek(weekPrintSelect.value || data.weeks[0]?.index || 0);
+    }
   }
 
   function setupPrintButtons() {
     document.querySelectorAll('[data-print-mode]').forEach((button) => {
       button.addEventListener('click', () => {
-        document.body.classList.toggle('print-week', button.dataset.printMode === 'week');
+        const isWeekMode = button.dataset.printMode === 'week';
+        document.body.classList.toggle('print-week', isWeekMode);
         window.print();
       });
+    });
+
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('print-week');
     });
   }
 
   function setupExportImage() {
     document.getElementById('exportImageBtn').addEventListener('click', async () => {
-      const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
-      const canvas = await html2canvas(document.getElementById('calendarCapture'), { backgroundColor: '#ffffff' });
-      const link = document.createElement('a');
-      link.download = `calendar-${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      try {
+        validationEl.classList.add('d-none');
+        document.body.classList.add('exporting-calendar');
+        const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
+        const calendarNode = document.getElementById('calendarCapture');
+        const canvas = await html2canvas(calendarNode, {
+          backgroundColor: '#ffffff',
+          scale: Math.max(window.devicePixelRatio || 1, 2),
+          useCORS: true,
+          logging: false,
+        });
+        const link = document.createElement('a');
+        link.download = `calendar-${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (error) {
+        showValidation('Export failed. Please try again after the calendar fully loads.');
+      } finally {
+        document.body.classList.remove('exporting-calendar');
+      }
+    });
+  }
+
+  function setupContextMenus() {
+    [dateMenu, eventMenu].forEach((menu) => {
+      menu.addEventListener('click', (event) => event.stopPropagation());
+      menu.addEventListener('contextmenu', (event) => event.preventDefault());
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.context-menu')) hideMenus();
+    });
+    document.addEventListener('contextmenu', (event) => {
+      if (!event.target.closest('.calendar-cell') && !event.target.closest('.event-chip')) hideMenus();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') hideMenus();
+    });
+    window.addEventListener('scroll', hideMenus, { passive: true });
+    window.addEventListener('resize', hideMenus);
+  }
+
+  function setupFormBehavior() {
+    document.getElementById('recurrenceType').addEventListener('change', () => {
+      toggleWeeklyOptions();
+      buildDayLabels();
+    });
+    document.getElementById('allDay').addEventListener('change', syncAllDayState);
+    document.getElementById('title').addEventListener('input', () => buildDayLabels(getCurrentLabelValues()));
+    document.getElementById('startDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
+    document.getElementById('endDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
+
+    eventForm.addEventListener('submit', (event) => {
+      const error = validateEventForm();
+      if (error) {
+        event.preventDefault();
+        showValidation(error);
+      }
     });
   }
 
@@ -198,31 +235,83 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildDayLabels(existingLabels = {}) {
     const start = document.getElementById('startDate').value;
     const end = document.getElementById('endDate').value;
+    const recurrenceType = document.getElementById('recurrenceType').value;
     dayLabelsContainer.innerHTML = '';
-    if (!start || !end) return;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const span = ((endDate - startDate) / 86400000) + 1;
-    if (span <= 1 || span > 10) return;
+    if (!start || !end || recurrenceType !== 'none') return;
+
+    const span = getSpanDays(start, end);
+    if (!Number.isFinite(span) || span <= 1 || span > 10) return;
+
     for (let offset = 0; offset < span; offset += 1) {
       const wrapper = document.createElement('div');
       wrapper.className = 'col-md-6';
-      wrapper.innerHTML = `
-        <label class="form-label">Day ${offset + 1} label</label>
-        <input class="form-control" name="label_${offset}" value="${existingLabels[offset] || ''}" placeholder="Day ${offset + 1}: ${document.getElementById('title').value || 'Event title'}">
-      `;
+      const input = document.createElement('input');
+      input.className = 'form-control';
+      input.name = `label_${offset}`;
+      input.maxLength = 200;
+      input.value = existingLabels[offset] || existingLabels[String(offset)] || '';
+      input.placeholder = `Day ${offset + 1}: ${document.getElementById('title').value || 'Event title'}`;
+
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.textContent = `Day ${offset + 1} label`;
+
+      wrapper.append(label, input);
       dayLabelsContainer.appendChild(wrapper);
     }
+  }
+
+  function getCurrentLabelValues() {
+    const values = {};
+    dayLabelsContainer.querySelectorAll('input[name^="label_"]').forEach((input) => {
+      values[input.name.replace('label_', '')] = input.value;
+    });
+    return values;
   }
 
   function syncAllDayState() {
     const allDay = document.getElementById('allDay').checked;
     document.getElementById('startTime').disabled = allDay;
     document.getElementById('endTime').disabled = allDay;
+    if (allDay) {
+      document.getElementById('startTime').value = '';
+      document.getElementById('endTime').value = '';
+    }
   }
 
   function toggleWeeklyOptions() {
-    document.getElementById('weeklyOptions').style.display = document.getElementById('recurrenceType').value === 'weekly' ? 'block' : 'none';
+    const isWeekly = document.getElementById('recurrenceType').value === 'weekly';
+    document.getElementById('weeklyOptions').style.display = isWeekly ? 'block' : 'none';
+    document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
+      checkbox.disabled = !isWeekly;
+      if (!isWeekly) checkbox.checked = false;
+    });
+  }
+
+  function validateEventForm() {
+    const title = document.getElementById('title').value.trim();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const recurrenceType = document.getElementById('recurrenceType').value;
+    const startTime = document.getElementById('startTime').value;
+    const endTime = document.getElementById('endTime').value;
+    const allDay = document.getElementById('allDay').checked;
+    const selectedWeekdays = document.querySelectorAll('input[name="recurrence_weekdays"]:checked').length;
+
+    if (!title) return 'Please enter an event title.';
+    if (!startDate || !endDate) return 'Please choose both a start date and an end date.';
+
+    const spanDays = getSpanDays(startDate, endDate);
+    if (!Number.isFinite(spanDays)) return 'Please choose valid event dates.';
+    if (spanDays < 1) return 'End date cannot be before start date.';
+    if (recurrenceType === 'none' && spanDays > 10) return 'Multi-day events cannot exceed 10 days.';
+    if (!allDay && startTime && endTime && startDate === endDate && endTime < startTime) {
+      return 'End time cannot be earlier than start time for the same day.';
+    }
+    if (recurrenceType === 'weekly' && selectedWeekdays === 0) {
+      return 'Choose at least one weekday for a weekly recurring event.';
+    }
+    return '';
   }
 
   function showMenu(menu, x, y) {
@@ -235,5 +324,33 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideMenus() {
     dateMenu.classList.add('d-none');
     eventMenu.classList.add('d-none');
+  }
+
+  function getSpanDays(startDate, endDate) {
+    return ((new Date(`${endDate}T00:00:00`) - new Date(`${startDate}T00:00:00`)) / 86400000) + 1;
+  }
+
+  async function saveDateStyle(url, payload) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        showValidation(result.message || 'Unable to save that date style right now.');
+        return { ok: false };
+      }
+      return { ok: true, result };
+    } catch (error) {
+      showValidation('Unable to save that date style right now.');
+      return { ok: false };
+    }
+  }
+
+  function showValidation(message) {
+    validationEl.textContent = message;
+    validationEl.classList.remove('d-none');
   }
 });

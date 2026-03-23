@@ -4,18 +4,18 @@
   <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 no-print">
     <div>
       <h1 class="h3 mb-1">myCal Monthly Planner</h1>
-      <p class="text-muted mb-0">Local-first Flask calendar with holidays, recurring events, and printable views.</p>
+      <p class="text-muted mb-0">A polished monthly planner for holidays, recurring events, printable weeks, and quick exports.</p>
     </div>
     <form class="row g-2 align-items-center" method="get">
       <div class="col-auto">
-        <select class="form-select" name="month">
+        <select class="form-select" name="month" aria-label="Month">
           {% for month_name in month_names %}
           <option value="{{ loop.index }}" {% if loop.index == selected_month %}selected{% endif %}>{{ month_name }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-auto">
-        <select class="form-select" name="year">
+        <select class="form-select" name="year" aria-label="Year">
           {% for year in years %}
           <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
           {% endfor %}
@@ -30,10 +30,23 @@
     </form>
   </div>
 
-  <div class="d-flex flex-wrap gap-2 mb-3 no-print action-bar">
-    <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print month</button>
-    <button class="btn btn-outline-primary btn-sm" data-print-mode="week">Print selected week</button>
-    <button class="btn btn-outline-secondary btn-sm" id="exportImageBtn">Export image</button>
+  <div class="toolbar-panel no-print mb-3">
+    <div class="d-flex flex-column flex-xl-row gap-3 justify-content-between align-items-xl-center">
+      <div class="d-flex flex-wrap gap-2 action-bar">
+        <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print month</button>
+        <button class="btn btn-outline-primary btn-sm" data-print-mode="week">Print selected week</button>
+        <button class="btn btn-outline-secondary btn-sm" id="exportImageBtn">Export image</button>
+      </div>
+      <div class="week-picker-wrap d-flex flex-column flex-md-row gap-2 align-items-md-center">
+        <label class="form-label mb-0 fw-semibold" for="weekPrintSelect">Week to print</label>
+        <select class="form-select form-select-sm" id="weekPrintSelect" aria-label="Week to print">
+          {% for week in weeks %}
+          <option value="{{ week.index }}" {% if loop.first %}selected{% endif %}>Week {{ loop.index }} · {{ week.label }}</option>
+          {% endfor %}
+        </select>
+        <span class="text-muted small">Choose a visible month row before using week print mode.</span>
+      </div>
+    </div>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -49,21 +62,22 @@
   <div class="card shadow-sm calendar-card" id="calendarCapture">
     <div class="card-body p-0">
       <div class="calendar-title text-center py-3 border-bottom">
-        <h2 class="h4 mb-0">{{ month_name }} {{ selected_year }}</h2>
+        <h2 class="h4 mb-1">{{ month_name }} {{ selected_year }}</h2>
+        <p class="small text-muted mb-0">Click a week row to highlight it, or use the week selector above for print mode.</p>
       </div>
       <div class="calendar-grid-wrapper">
         <div class="calendar-grid weekdays">
-          {% for weekday in ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] %}
+          {% for weekday in weekday_names %}
           <div class="weekday-cell">{{ weekday }}</div>
           {% endfor %}
         </div>
         {% for week in grid %}
-        <div class="calendar-grid week-row" data-week-index="{{ loop.index0 }}">
+        <div class="calendar-grid week-row {% if loop.first %}selected-week{% endif %}" data-week-index="{{ loop.index0 }}">
           {% for day in week %}
           {% set iso = day.isoformat() %}
           <div class="calendar-cell {% if day.month != selected_month %}outside-month{% endif %}" data-date="{{ iso }}">
             <div class="calendar-cell-header">
-              <button type="button" class="btn btn-sm btn-light date-action-btn no-print" data-date-action="{{ iso }}">⋮</button>
+              <button type="button" class="btn btn-sm btn-light date-action-btn no-print" data-date-action="{{ iso }}" aria-label="Date actions">⋮</button>
               <div>
                 <div class="day-number">{{ day.day }}</div>
               </div>
@@ -83,9 +97,12 @@
 <div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
-      <form method="post" action="{{ url_for('calendar.save_event') }}" id="eventForm">
+      <form method="post" action="{{ url_for('calendar.save_event') }}" id="eventForm" novalidate>
         <div class="modal-header">
-          <h5 class="modal-title">Event</h5>
+          <div>
+            <h5 class="modal-title">Event</h5>
+            <p class="text-muted small mb-0">Single-day, multi-day, daily, and weekly recurring events are all supported.</p>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
@@ -94,17 +111,17 @@
           <input type="hidden" name="return_month" value="{{ selected_month }}">
           <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
           <div class="row g-3">
-            <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" required></div>
+            <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
             <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" required></div>
             <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" required></div>
             <div class="col-md-3 form-check ms-2 mt-4"><input type="checkbox" class="form-check-input" name="all_day" id="allDay"><label class="form-check-label" for="allDay">All day</label></div>
             <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"></div>
             <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" name="end_time" id="endTime"></div>
             <div class="col-md-3"><label class="form-label">Audience</label><select class="form-select" name="audience" id="audience">{% for audience in audience_choices %}<option value="{{ audience }}">{{ audience }}</option>{% endfor %}</select></div>
-            <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" id="location"></div>
+            <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" id="location" maxlength="200"></div>
             <div class="col-md-3"><label class="form-label">Recurrence</label><select class="form-select" name="recurrence_type" id="recurrenceType">{% for recurrence in recurrence_choices %}<option value="{{ recurrence }}">{{ recurrence.title() }}</option>{% endfor %}</select></div>
-            <div class="col-md-12" id="weeklyOptions"><label class="form-label">Weekly recurrence weekdays</label><div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div></div>
-            <div class="col-md-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="notes" id="notes"></textarea></div>
+            <div class="col-md-12" id="weeklyOptions"><label class="form-label">Weekly recurrence weekdays</label><div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div><div class="form-text">Pick one or more weekdays when using weekly recurrence.</div></div>
+            <div class="col-md-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="notes" id="notes" maxlength="5000"></textarea></div>
             <div class="col-md-12">
               <label class="form-label">Custom per-day labels</label>
               <div class="row g-2" id="dayLabelsContainer"></div>
@@ -112,10 +129,12 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <div class="me-auto text-danger small d-none" id="eventValidation"></div>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary">Save event</button>
+        <div class="modal-footer flex-column align-items-stretch gap-2">
+          <div class="alert alert-danger small d-none mb-0" id="eventValidation" role="alert"></div>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Save event</button>
+          </div>
         </div>
       </form>
     </div>
