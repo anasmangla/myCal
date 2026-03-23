@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>myCal Static Planner</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar no-print">
+        <div>
+          <p class="eyebrow">GitHub Pages ready</p>
+          <h1>myCal Monthly Planner</h1>
+          <p class="subtitle">A local-first monthly calendar with browser storage, holiday overlays, printing, backup import/export, and touch-friendly controls.</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="ghost-button" id="changeMonthBtn">Choose month</button>
+          <button type="button" class="ghost-button" id="todayBtn">Jump to next month</button>
+        </div>
+      </header>
+
+      <section class="control-panel no-print">
+        <div class="month-controls">
+          <button type="button" class="nav-button" id="prevMonthBtn" aria-label="Previous month">&larr;</button>
+          <div class="month-heading-wrap">
+            <h2 id="monthHeading">Month Year</h2>
+            <p id="monthMeta">Sunday-first layout with localStorage persistence.</p>
+          </div>
+          <button type="button" class="nav-button" id="nextMonthBtn" aria-label="Next month">&rarr;</button>
+        </div>
+
+        <div class="toolbar-grid">
+          <label class="toggle-card">
+            <input type="checkbox" id="holidayToggle">
+            <span>
+              <strong>Include U.S. federal holidays</strong>
+              <small>Show holidays and long weekends in this month.</small>
+            </span>
+          </label>
+
+          <label class="toolbar-card">
+            <span class="toolbar-label">Selected week</span>
+            <select id="weekSelect"></select>
+          </label>
+
+          <div class="toolbar-card toolbar-buttons touch-actions">
+            <button type="button" class="action-button" id="addEventBtn">Add event</button>
+            <button type="button" class="action-button" id="dateColorBtn">Color a date</button>
+            <button type="button" class="action-button" id="clearDateColorBtn">Clear date color</button>
+          </div>
+
+          <div class="toolbar-card toolbar-buttons">
+            <button type="button" class="action-button" id="printMonthBtn">Print full month</button>
+            <button type="button" class="action-button" id="printWeekBtn">Print selected week</button>
+            <button type="button" class="action-button" id="exportImageBtn">Export image</button>
+          </div>
+
+          <div class="toolbar-card toolbar-buttons">
+            <button type="button" class="action-button" id="exportJsonBtn">Export backup JSON</button>
+            <label class="action-button file-button">
+              <span>Import backup JSON</span>
+              <input type="file" id="importJsonInput" accept="application/json">
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="legend-panel no-print">
+        <div class="legend-title-wrap">
+          <h3>Audience colors</h3>
+          <p>Timed events can be entered like <span class="sample-format">6:30pm Jalsa Salana @ Masjid Mahdi for Atfal</span>.</p>
+        </div>
+        <div id="groupLegend" class="legend-grid"></div>
+      </section>
+
+      <p class="status-banner no-print" id="statusBanner" aria-live="polite"></p>
+
+      <main class="calendar-card" id="calendarCapture">
+        <div class="calendar-print-header print-only">
+          <h2 id="printMonthHeading">Month Year</h2>
+          <p id="printMeta">Printed from myCal static planner.</p>
+        </div>
+        <div class="weekdays-row" id="weekdaysRow"></div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop visible" id="startupModalBackdrop">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="startupTitle">
+        <div class="modal-header-block">
+          <div>
+            <p class="eyebrow">Welcome</p>
+            <h2 id="startupTitle">Choose your calendar month</h2>
+          </div>
+        </div>
+        <div class="modal-body-block">
+          <p>The default selection is next month from today, but you can change it before the calendar opens.</p>
+          <div class="form-grid compact-grid">
+            <label>
+              <span>Month</span>
+              <select id="startupMonth"></select>
+            </label>
+            <label>
+              <span>Year</span>
+              <select id="startupYear"></select>
+            </label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="startupCancelBtn">Use default</button>
+          <button type="button" class="primary-button" id="startupOpenBtn">Open calendar</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop hidden" id="eventModalBackdrop">
+      <section class="modal-card wide-modal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+        <div class="modal-header-block">
+          <div>
+            <p class="eyebrow">Event details</p>
+            <h2 id="eventModalTitle">Add or edit event</h2>
+          </div>
+          <button type="button" class="icon-button" data-close-modal="event">&times;</button>
+        </div>
+        <form id="eventForm" class="modal-body-block">
+          <input type="hidden" id="eventId">
+          <div class="form-grid">
+            <label>
+              <span>Event text</span>
+              <input type="text" id="eventTitle" maxlength="200" placeholder="6:30pm Jalsa Salana @ Masjid Mahdi for Atfal" required>
+            </label>
+            <label>
+              <span>Audience / group</span>
+              <select id="eventAudience"></select>
+            </label>
+            <label>
+              <span>Start date</span>
+              <input type="date" id="eventStartDate" required>
+            </label>
+            <label>
+              <span>End date</span>
+              <input type="date" id="eventEndDate" required>
+            </label>
+            <label class="checkbox-line">
+              <input type="checkbox" id="eventAllDay">
+              <span>All-day event</span>
+            </label>
+            <label>
+              <span>Time label</span>
+              <input type="text" id="eventTimeLabel" maxlength="40" placeholder="6:30pm">
+            </label>
+            <label>
+              <span>Location</span>
+              <input type="text" id="eventLocation" maxlength="200" placeholder="Masjid Mahdi">
+            </label>
+            <label>
+              <span>Recurrence</span>
+              <select id="eventRecurrence">
+                <option value="none">No recurrence</option>
+                <option value="daily">Daily in visible month</option>
+                <option value="weekly">Weekly in visible month</option>
+              </select>
+            </label>
+          </div>
+
+          <fieldset class="weekday-picker" id="weekdayPicker">
+            <legend>Weekly recurrence weekdays</legend>
+            <div id="weekdayCheckboxes" class="weekday-checkboxes"></div>
+          </fieldset>
+
+          <section class="multiday-labels">
+            <div class="section-heading">
+              <h3>Multi-day labels</h3>
+              <p>Optional overrides for Day 1 through Day 10.</p>
+            </div>
+            <div id="dayLabelFields" class="form-grid compact-grid"></div>
+          </section>
+
+          <div class="form-grid">
+            <label>
+              <span>Notes</span>
+              <textarea id="eventNotes" rows="4" maxlength="4000" placeholder="Optional notes"></textarea>
+            </label>
+          </div>
+
+          <p class="form-error" id="eventFormError"></p>
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" data-close-modal="event">Cancel</button>
+            <button type="submit" class="primary-button">Save event</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop hidden" id="dateActionModalBackdrop">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="dateActionTitle">
+        <div class="modal-header-block">
+          <div>
+            <p class="eyebrow">Date actions</p>
+            <h2 id="dateActionTitle">Manage selected date</h2>
+          </div>
+          <button type="button" class="icon-button" data-close-modal="dateAction">&times;</button>
+        </div>
+        <div class="modal-body-block">
+          <p id="dateActionText">Choose what you want to do for this date.</p>
+          <div class="stacked-actions">
+            <button type="button" class="action-button" id="modalAddEventBtn">Add event</button>
+            <button type="button" class="action-button" id="modalColorDateBtn">Change date background color</button>
+            <button type="button" class="action-button" id="modalClearDateColorBtn">Clear custom date background color</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="menu hidden" id="dateContextMenu">
+      <button type="button" data-menu-action="add-event">Add event</button>
+      <button type="button" data-menu-action="color-date">Change date background color</button>
+      <button type="button" data-menu-action="clear-date-color">Clear custom date background color</button>
+    </div>
+
+    <div class="menu hidden" id="eventContextMenu">
+      <button type="button" data-menu-action="delete-event" class="danger">Delete event</button>
+    </div>
+
+    <input type="color" id="dateColorPicker" class="hidden-input" value="#fff4bf">
+
+    <script type="module" src="assets/js/app.js"></script>
+  </body>
+</html>

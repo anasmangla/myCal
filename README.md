@@ -1,64 +1,48 @@
-# myCal
+# myCal Static GitHub Pages App
 
-A local-first monthly calendar web app built with Flask, SQLite, SQLAlchemy, Bootstrap 5, and vanilla JavaScript.
+A pure static monthly calendar app that runs directly from `index.html` and stores all data in browser `localStorage`.
 
-## Features
-
-- Sunday-first monthly calendar grid with month/year selectors.
-- Defaults to next month from the current date on first load.
-- SQLite-backed persistent event storage with SQLAlchemy ORM.
-- U.S. federal holiday overlay using the `holidays` package.
-- Long-weekend highlighting for Friday and Monday federal holidays.
-- Event create/edit modal with multi-day labels, recurring events, and audience-based colors.
-- Custom date background colors stored per day.
-- Print month / selected week plus image export.
-
-## Project structure
+## Static file tree
 
 ```text
 myCal/
-├── app/
-│   ├── __init__.py
-│   ├── calendar_utils.py
-│   ├── event_utils.py
-│   ├── models.py
-│   ├── routes.py
-│   ├── static/
-│   │   ├── css/styles.css
-│   │   └── js/app.js
-│   └── templates/
-│       ├── base.html
-│       └── index.html
-├── instance/
+├── index.html
+├── assets/
+│   ├── css/
+│   │   └── styles.css
+│   └── js/
+│       └── app.js
 ├── .gitignore
-├── README.md
-├── requirements.txt
-└── run.py
+└── README.md
 ```
 
-## Setup
+## Features
+
+- Opens directly to the calendar UI instead of a README landing page.
+- Startup month picker defaults to next month from today.
+- Sunday-first monthly grid.
+- Local `localStorage` persistence for events and custom date colors.
+- U.S. federal holiday toggle with all-day holiday entries and long-weekend highlighting.
+- Multi-event support, all-day events, multi-day events up to 10 days, daily and weekly month recurrence.
+- Right-click or touch-friendly buttons for date actions.
+- Left-click event edit and right-click event delete.
+- Print month, print selected week, export image, and JSON backup import/export.
+
+## GitHub Pages publish
+
+1. Push this repository to GitHub.
+2. In the repository settings, open **Pages**.
+3. Set the source to **Deploy from a branch**.
+4. Choose your main branch and the **root** folder.
+5. Save the settings.
+6. Open the published GitHub Pages URL. The calendar app loads immediately from `index.html`.
+
+## Local preview
+
+Because this is a static site, you can open `index.html` directly in a browser or serve it locally:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python run.py
+python3 -m http.server 8000
 ```
 
-Then open http://127.0.0.1:5000/.
-
-## Notes
-
-- The database file is created automatically in `instance/calendar.db`.
-- Recurring events render only within the visible month range.
-- Browser print dialog can save to PDF for month or selected week export.
-- The export image button uses `html2canvas` from a CDN in the browser.
-
-## Testing checklist
-
-- Launch the app and confirm it opens to next month.
-- Toggle U.S. holidays and verify holiday chips render.
-- Add, edit, and delete timed, all-day, recurring, and multi-day events.
-- Apply and clear a custom date background color.
-- Use Print month / Print selected week and save as PDF.
-- Use Export image and verify a PNG downloads.
+Then visit `http://localhost:8000/`.
