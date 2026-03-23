@@ -14,6 +14,7 @@ from .calendar_utils import (
     first_visible_month,
     month_context,
 )
+from .event_utils import ValidationError, parse_event_form
 from .models import DateStyle, Event, EventDayLabel
 
 bp = Blueprint('calendar', __name__)
@@ -41,7 +42,10 @@ def index():
         styles_json=json.dumps(context['styles']),
         holiday_json=json.dumps({key.isoformat(): value for key, value in context['holiday_map'].items()}),
         long_weekend_json=json.dumps(list(context['long_weekends'])),
+        week_json=json.dumps(context['weeks']),
         grid=context['grid'],
+        weeks=context['weeks'],
+        weekday_names=context['weekday_names'],
         month_name=context['month_name'],
     )
 
@@ -73,55 +77,33 @@ def get_event(event_id: int):
 def save_event():
     form = request.form
     try:
-        event_id = form.get('event_id', type=int)
-        title = (form.get('title') or '').strip()
-        start_date = datetime.strptime(form['start_date'], '%Y-%m-%d').date()
-        end_date = datetime.strptime(form['end_date'], '%Y-%m-%d').date()
-        all_day = form.get('all_day') == 'on'
-        start_time = datetime.strptime(form['start_time'], '%H:%M').time() if form.get('start_time') else None
-        end_time = datetime.strptime(form['end_time'], '%H:%M').time() if form.get('end_time') else None
-        recurrence_type = form.get('recurrence_type', 'none')
-        recurrence_weekdays = ','.join(request.form.getlist('recurrence_weekdays')) if recurrence_type == 'weekly' else ''
-        span_days = (end_date - start_date).days + 1
-
-        if not title:
-            raise ValueError('Title is required.')
-        if end_date < start_date:
-            raise ValueError('End date cannot be before start date.')
-        if recurrence_type == 'none' and span_days > 10:
-            raise ValueError('Multi-day events cannot exceed 10 days.')
-
-        event = Event.query.get(event_id) if event_id else Event()
-        if not event_id:
+        payload = parse_event_form(form)
+        event = Event.query.get(payload.event_id) if payload.event_id else Event()
+        if payload.event_id and event is None:
+            raise ValidationError('The event you tried to edit no longer exists.')
+        if not payload.event_id:
             db.session.add(event)
 
-        event.title = title
-        event.start_date = start_date
-        event.end_date = end_date
-        event.start_time = None if all_day else start_time
-        event.end_time = None if all_day else end_time
-        event.all_day = all_day
-        event.location = (form.get('location') or '').strip() or None
-        event.audience = form.get('audience', 'Unspecified')
-        event.notes = (form.get('notes') or '').strip() or None
-        event.recurrence_type = recurrence_type
-        event.recurrence_weekdays = recurrence_weekdays
+        event.title = payload.title
+        event.start_date = payload.start_date
+        event.end_date = payload.end_date
+        event.start_time = payload.start_time
+        event.end_time = payload.end_time
+        event.all_day = payload.all_day
+        event.location = payload.location
+        event.audience = payload.audience
+        event.notes = payload.notes
+        event.recurrence_type = payload.recurrence_type
+        event.recurrence_weekdays = payload.recurrence_weekdays
 
         db.session.flush()
         EventDayLabel.query.filter_by(event_id=event.id).delete()
-
-        for key, value in form.items():
-            if not key.startswith('label_'):
-                continue
-            label_text = value.strip()
-            if not label_text:
-                continue
-            offset = int(key.split('_', 1)[1])
+        for offset, label_text in payload.labels.items():
             db.session.add(EventDayLabel(event_id=event.id, day_offset=offset, label=label_text))
 
         db.session.commit()
-        flash('Event saved.', 'success')
-    except ValueError as exc:
+        flash('Event saved successfully.', 'success')
+    except ValidationError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
 
@@ -139,25 +121,51 @@ def delete_event(event_id: int):
 
 @bp.post('/date-style')
 def save_date_style():
-    day = datetime.strptime(request.form['day'], '%Y-%m-%d').date()
-    color = request.form['background_color']
+    try:
+        day = _parse_day(request.form.get('day'))
+        color = _validate_color(request.form.get('background_color'))
+    except ValidationError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+
     style = DateStyle.query.filter_by(day=day).first()
     if style:
         style.background_color = color
     else:
         db.session.add(DateStyle(day=day, background_color=color))
     db.session.commit()
-    return jsonify({'status': 'ok'})
+    return jsonify({'status': 'ok', 'message': 'Date color saved.'})
 
 
 @bp.post('/date-style/clear')
 def clear_date_style():
-    day = datetime.strptime(request.form['day'], '%Y-%m-%d').date()
+    try:
+        day = _parse_day(request.form.get('day'))
+    except ValidationError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+
     style = DateStyle.query.filter_by(day=day).first()
     if style:
         db.session.delete(style)
         db.session.commit()
-    return jsonify({'status': 'ok'})
+    return jsonify({'status': 'ok', 'message': 'Custom date color cleared.'})
+
+def _parse_day(raw_value: str | None):
+    if not raw_value:
+        raise ValidationError('Choose a valid calendar date.')
+    try:
+        return datetime.strptime(raw_value, '%Y-%m-%d').date()
+    except ValueError as exc:
+        raise ValidationError('Choose a valid calendar date.') from exc
+
+def _validate_color(raw_value: str | None) -> str:
+    value = (raw_value or '').strip()
+    if len(value) != 7 or not value.startswith('#'):
+        raise ValidationError('Choose a valid hex color.')
+    allowed = set('0123456789abcdefABCDEF')
+    if any(char not in allowed for char in value[1:]):
+        raise ValidationError('Choose a valid hex color.')
+    return value.lower()
+
 
 
 def _return_url():
