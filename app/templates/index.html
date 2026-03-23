@@ -33,19 +33,10 @@
   <div class="toolbar-panel no-print mb-3">
     <div class="d-flex flex-column flex-xl-row gap-3 justify-content-between align-items-xl-center">
       <div class="d-flex flex-wrap gap-2 action-bar">
-        <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print month</button>
-        <button class="btn btn-outline-primary btn-sm" data-print-mode="week">Print selected week</button>
+        <button class="btn btn-outline-primary btn-sm" data-print-mode="month">Print / Save PDF</button>
         <button class="btn btn-outline-secondary btn-sm" id="exportImageBtn">Export image</button>
       </div>
-      <div class="week-picker-wrap d-flex flex-column flex-md-row gap-2 align-items-md-center">
-        <label class="form-label mb-0 fw-semibold" for="weekPrintSelect">Week to print</label>
-        <select class="form-select form-select-sm" id="weekPrintSelect" aria-label="Week to print">
-          {% for week in weeks %}
-          <option value="{{ week.index }}" {% if loop.first %}selected{% endif %}>Week {{ loop.index }} · {{ week.label }}</option>
-          {% endfor %}
-        </select>
-        <span class="text-muted small">Choose a visible month row before using week print mode.</span>
-      </div>
+<div class="text-muted small">Double-click any date in this month to add an event. Printing and image exports use landscape layout.</div>
     </div>
   </div>
 
@@ -63,7 +54,7 @@
     <div class="card-body p-0">
       <div class="calendar-title text-center py-3 border-bottom">
         <h2 class="h4 mb-1">{{ month_name }} {{ selected_year }}</h2>
-        <p class="small text-muted mb-0">Click a week row to highlight it, or use the week selector above for print mode.</p>
+        <p class="small text-muted mb-0">Double-click a date to add an event, or right-click an in-month date for more actions.</p>
       </div>
       <div class="calendar-grid-wrapper">
         <div class="calendar-grid weekdays">
@@ -75,7 +66,9 @@
         <div class="calendar-grid week-row {% if loop.first %}selected-week{% endif %}" data-week-index="{{ loop.index0 }}">
           {% for day in week %}
           {% set iso = day.isoformat() %}
-          <div class="calendar-cell {% if day.month != selected_month %}outside-month{% endif %}" data-date="{{ iso }}">
+          {% set in_month = day.month == selected_month %}
+          <div class="calendar-cell {% if not in_month %}outside-month{% endif %}" data-date="{{ iso }}" data-in-month="{{ "true" if in_month else "false" }}">
+            {% if in_month %}
             <div class="calendar-cell-header">
               <button type="button" class="btn btn-sm btn-light date-action-btn no-print" data-date-action="{{ iso }}" aria-label="Date actions">⋮</button>
               <div>
@@ -84,7 +77,9 @@
             </div>
             <div class="holiday-pill small"></div>
             <div class="event-list" data-events-for="{{ iso }}"></div>
-            <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2 no-print quick-add-btn" data-quick-add="{{ iso }}">+ Add</button>
+            {% else %}
+            <div class="outside-month-fill" aria-hidden="true"></div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>

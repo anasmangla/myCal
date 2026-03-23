@@ -9,31 +9,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
   const deleteForm = document.getElementById('deleteEventForm');
-  const weekPrintSelect = document.getElementById('weekPrintSelect');
   let activeDate = null;
   let activeEventId = null;
 
   applyDateStyles();
   renderEvents();
-  setupWeekSelection();
+  setupRowHighlighting();
   setupPrintButtons();
   setupExportImage();
   setupContextMenus();
   setupFormBehavior();
 
-  document.querySelectorAll('.quick-add-btn, .date-action-btn').forEach((button) => {
+  document.querySelectorAll('.date-action-btn').forEach((button) => {
     button.addEventListener('click', () => {
-      const day = button.dataset.quickAdd || button.dataset.dateAction;
-      openEventModal({ start_date: day, end_date: day });
+      openEventModal({ start_date: button.dataset.dateAction, end_date: button.dataset.dateAction });
     });
     button.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      activeDate = button.dataset.quickAdd || button.dataset.dateAction;
+      activeDate = button.dataset.dateAction;
       showMenu(dateMenu, event.pageX, event.pageY);
     });
   });
 
-  document.querySelectorAll('.calendar-cell').forEach((cell) => {
+  document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
+    cell.addEventListener('dblclick', () => {
+      activeDate = cell.dataset.date;
+      openEventModal({ start_date: activeDate, end_date: activeDate });
+    });
     cell.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       activeDate = cell.dataset.date;
@@ -68,6 +70,15 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteForm.submit();
   });
 
+  function currentMonthBounds() {
+    const monthText = String(data.selectedMonth).padStart(2, '0');
+    const lastDay = new Date(Date.UTC(data.selectedYear, data.selectedMonth, 0)).getUTCDate();
+    return {
+      start: `${data.selectedYear}-${monthText}-01`,
+      end: `${data.selectedYear}-${monthText}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }
+
   function renderEvents() {
     document.querySelectorAll('[data-events-for]').forEach((container) => {
       const date = container.dataset.eventsFor;
@@ -99,50 +110,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyDateStyles() {
-    document.querySelectorAll('.calendar-cell').forEach((cell) => {
+    document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
       const iso = cell.dataset.date;
       const day = new Date(`${iso}T00:00:00`);
       const jsDay = day.getUTCDay();
       if (jsDay === 0 || jsDay === 6) cell.classList.add('weekend');
       if (data.holidays[iso]) cell.classList.add('holiday');
       if (data.longWeekends.includes(iso)) cell.classList.add('long-weekend');
-      if (data.styles[iso]) {
-        cell.style.background = data.styles[iso];
-      }
+      if (data.styles[iso]) cell.style.background = data.styles[iso];
       const holidayPill = cell.querySelector('.holiday-pill');
       holidayPill.textContent = data.holidays[iso] || '';
       holidayPill.classList.toggle('holiday-pill-long', Boolean(data.longWeekends.includes(iso)));
     });
   }
 
-  function setupWeekSelection() {
-    const rows = Array.from(document.querySelectorAll('.week-row'));
-    const setSelectedWeek = (weekIndex) => {
-      rows.forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(weekIndex)));
-      if (weekPrintSelect) weekPrintSelect.value = String(weekIndex);
-    };
-
-    rows.forEach((row) => {
-      row.addEventListener('click', () => setSelectedWeek(row.dataset.weekIndex));
+  function setupRowHighlighting() {
+    document.querySelectorAll('.week-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        document.querySelectorAll('.week-row').forEach((item) => item.classList.toggle('selected-week', item === row));
+      });
     });
-
-    if (weekPrintSelect) {
-      weekPrintSelect.addEventListener('change', () => setSelectedWeek(weekPrintSelect.value));
-      setSelectedWeek(weekPrintSelect.value || data.weeks[0]?.index || 0);
-    }
   }
 
   function setupPrintButtons() {
     document.querySelectorAll('[data-print-mode]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const isWeekMode = button.dataset.printMode === 'week';
-        document.body.classList.toggle('print-week', isWeekMode);
-        window.print();
-      });
-    });
-
-    window.addEventListener('afterprint', () => {
-      document.body.classList.remove('print-week');
+      button.addEventListener('click', () => window.print());
     });
   }
 
@@ -158,6 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
           scale: Math.max(window.devicePixelRatio || 1, 2),
           useCORS: true,
           logging: false,
+          width: calendarNode.scrollWidth,
+          height: calendarNode.scrollHeight,
+          windowWidth: Math.max(document.documentElement.clientWidth, 1600),
         });
         const link = document.createElement('a');
         link.download = `calendar-${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}.png`;
@@ -181,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!event.target.closest('.context-menu')) hideMenus();
     });
     document.addEventListener('contextmenu', (event) => {
-      if (!event.target.closest('.calendar-cell') && !event.target.closest('.event-chip')) hideMenus();
+      if (!event.target.closest('.calendar-cell[data-in-month="true"]') && !event.target.closest('.event-chip')) hideMenus();
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') hideMenus();
@@ -192,14 +187,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupFormBehavior() {
     document.getElementById('recurrenceType').addEventListener('change', () => {
+      syncRecurringEndDate();
       toggleWeeklyOptions();
       buildDayLabels();
     });
     document.getElementById('allDay').addEventListener('change', syncAllDayState);
     document.getElementById('title').addEventListener('input', () => buildDayLabels(getCurrentLabelValues()));
-    document.getElementById('startDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
+    document.getElementById('startDate').addEventListener('change', () => {
+      syncRecurringEndDate();
+      buildDayLabels(getCurrentLabelValues());
+    });
     document.getElementById('endDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
 
+    syncRecurringEndDate();
     eventForm.addEventListener('submit', (event) => {
       const error = validateEventForm();
       if (error) {
@@ -226,10 +226,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
       checkbox.checked = (payload.recurrence_weekdays || '').split(',').includes(checkbox.value);
     });
+    syncRecurringEndDate(Boolean(payload.id));
     syncAllDayState();
     toggleWeeklyOptions();
     buildDayLabels(payload.labels || {});
     eventModal.show();
+  }
+
+  function syncRecurringEndDate(preserveExistingRange = false) {
+    const recurrenceType = document.getElementById('recurrenceType').value;
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const { start, end } = currentMonthBounds();
+
+    [startDateInput, endDateInput].forEach((input) => {
+      input.min = start;
+      input.max = end;
+    });
+
+    if (startDateInput.value && (startDateInput.value < start || startDateInput.value > end)) startDateInput.value = '';
+    if (endDateInput.value && (endDateInput.value < start || endDateInput.value > end)) endDateInput.value = '';
+
+    if (recurrenceType !== 'none' && startDateInput.value) {
+      if (!preserveExistingRange || !endDateInput.value || endDateInput.value < startDateInput.value) {
+        endDateInput.value = end;
+      }
+      return;
+    }
+
+    if (startDateInput.value && (!endDateInput.value || endDateInput.value < startDateInput.value)) {
+      endDateInput.value = startDateInput.value;
+    }
   }
 
   function buildDayLabels(existingLabels = {}) {
@@ -297,9 +324,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const endTime = document.getElementById('endTime').value;
     const allDay = document.getElementById('allDay').checked;
     const selectedWeekdays = document.querySelectorAll('input[name="recurrence_weekdays"]:checked').length;
+    const { start: monthStart, end: monthEnd } = currentMonthBounds();
 
     if (!title) return 'Please enter an event title.';
     if (!startDate || !endDate) return 'Please choose both a start date and an end date.';
+    if (startDate < monthStart || startDate > monthEnd || endDate < monthStart || endDate > monthEnd) {
+      return 'Events must stay within the selected month.';
+    }
 
     const spanDays = getSpanDays(startDate, endDate);
     if (!Number.isFinite(spanDays)) return 'Please choose valid event dates.';

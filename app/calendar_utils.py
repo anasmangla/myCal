@@ -256,8 +256,8 @@ def month_context(year: int, month: int, include_holidays: bool) -> dict:
     start, end = month_bounds(year, month)
     grid = build_month_grid(year, month)
     weeks = build_week_metadata(grid, month)
-    visible_start = grid[0][0]
-    visible_end = grid[-1][-1]
+    visible_start = start
+    visible_end = end
     holiday_map = get_us_holidays(year, month) if include_holidays else {}
     long_weekends = detect_long_weekends(holiday_map) if include_holidays else set()
     styles = load_date_styles()
