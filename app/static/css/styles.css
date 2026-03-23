@@ -157,6 +157,25 @@ body {
   font-weight: 600;
 }
 
+.calendar-meta-line {
+  display: block;
+}
+
+.holiday-pill.has-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.islamic-note {
+  font-style: italic;
+}
+
+.islamic-important {
+  color: #166534;
+  font-weight: 600;
+}
+
 .context-menu {
   z-index: 2000;
   min-width: 220px;

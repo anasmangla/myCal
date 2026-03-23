@@ -18,6 +18,45 @@ const AUDIENCE_COLORS = {
 };
 const RECURRENCE_CHOICES = ['none', 'daily', 'weekly'];
 const WEEKDAY_CHOICES = WEEKDAY_NAMES.map((label, index) => ({ value: String(index), label }));
+const ISLAMIC_TEXT_FORMATTER = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+const ISLAMIC_NUMERIC_FORMATTER = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
+const ISLAMIC_HOLIDAYS = {
+  '1-1': 'Islamic New Year',
+  '1-10': 'Ashura',
+  '3-12': 'Mawlid',
+  '7-27': 'Isra & Miraj',
+  '9-1': 'Ramadan begins',
+  '9-27': 'Laylat al-Qadr (approx.)',
+  '10-1': 'Eid al-Fitr',
+  '12-8': 'Day of Arafah',
+  '12-10': 'Eid al-Adha',
+  '12-11': 'Days of Tashriq',
+  '12-12': 'Days of Tashriq',
+  '12-13': 'Days of Tashriq',
+};
+
+function getIslamicParts(date) {
+  const textParts = ISLAMIC_TEXT_FORMATTER.formatToParts(date);
+  const numericParts = ISLAMIC_NUMERIC_FORMATTER.formatToParts(date);
+  return {
+    monthName: textParts.find((part) => part.type === 'month')?.value || '',
+    monthNumber: Number(numericParts.find((part) => part.type === 'month')?.value || 0),
+    day: Number(textParts.find((part) => part.type === 'day')?.value || 0),
+  };
+}
+
+function buildIslamicLabels(date) {
+  const islamic = getIslamicParts(date);
+  const labels = [];
+
+  if (date.getUTCDate() === 1) labels.push({ text: `${islamic.monthName} ${islamic.day}`, italic: true });
+  if (islamic.day === 1) labels.push({ text: `${islamic.monthName} 1` });
+
+  const importantDay = ISLAMIC_HOLIDAYS[`${islamic.monthNumber}-${islamic.day}`];
+  if (importantDay) labels.push({ text: importantDay, important: true });
+
+  return labels;
+}
 
 function firstVisibleMonth(today = new Date()) {
   const month = today.getUTCMonth();
@@ -123,7 +162,7 @@ function loadState() {
   } catch (error) {
     console.warn('Unable to load myCal state', error);
   }
-  return { events: [], styles: {}, includeHolidays: true, nextId: 1 };
+  return { events: [], styles: {}, includeHolidays: true, includeIslamic: false, nextId: 1 };
 }
 
 function saveState() {
@@ -276,6 +315,7 @@ function initOptions() {
     weekdayCheckboxes.appendChild(wrapper);
   });
 
+  document.getElementById('islamicToggle').checked = state.includeIslamic === true;
   document.getElementById('holidaysToggle').checked = state.includeHolidays !== false;
 }
 
@@ -383,13 +423,19 @@ function renderCalendar() {
         });
       }
 
-      const holidayText = holidayMap.get(key) || '';
+      const metaLines = [];
+      if (holidayMap.has(key)) metaLines.push(`<span class="calendar-meta-line">${holidayMap.get(key)}</span>`);
+      if (state.includeIslamic === true) {
+        buildIslamicLabels(day).forEach((label) => {
+          metaLines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
+        });
+      }
       cell.innerHTML = inMonth ? `
         <div class="calendar-cell-header">
           <button type="button" class="btn btn-sm btn-light date-action-btn no-print" aria-label="Date actions">⋮</button>
           <div><div class="day-number">${day.getUTCDate()}</div></div>
         </div>
-        <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''}">${holidayText}</div>
+        <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''} ${metaLines.length ? 'has-content' : ''}">${metaLines.join('')}</div>
         <div class="event-list"></div>
       ` : '<div class="outside-month-fill" aria-hidden="true"></div>';
 
@@ -624,6 +670,11 @@ function bindUI() {
     view.year = Number(document.getElementById('yearSelect').value);
     renderCalendar();
   });
+  document.getElementById('islamicToggle').addEventListener('change', (event) => {
+    state.includeIslamic = event.target.checked;
+    saveState();
+    renderCalendar();
+  });
   document.getElementById('holidaysToggle').addEventListener('change', (event) => {
     state.includeHolidays = event.target.checked;
     saveState();
@@ -652,6 +703,8 @@ function bindUI() {
     state.styles = {};
     state.includeHolidays = true;
     state.nextId = 1;
+    state.includeIslamic = false;
+    document.getElementById('islamicToggle').checked = false;
     document.getElementById('holidaysToggle').checked = true;
     renderCalendar();
     flash('Saved calendar data was reset for this browser.', 'warning');

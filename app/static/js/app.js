@@ -168,6 +168,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const islamicNumericFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
+  const islamicHolidayMap = {
+    '1-1': 'Islamic New Year',
+    '1-10': 'Ashura',
+    '3-12': 'Mawlid',
+    '7-27': 'Isra & Miraj',
+    '9-1': 'Ramadan begins',
+    '9-27': 'Laylat al-Qadr (approx.)',
+    '10-1': 'Eid al-Fitr',
+    '12-8': 'Day of Arafah',
+    '12-10': 'Eid al-Adha',
+    '12-11': 'Days of Tashriq',
+    '12-12': 'Days of Tashriq',
+    '12-13': 'Days of Tashriq',
+  };
+
+  function getIslamicParts(iso) {
+    const date = new Date(`${iso}T00:00:00Z`);
+    const parts = islamicFormatter.formatToParts(date);
+    const numericParts = islamicNumericFormatter.formatToParts(date);
+    return {
+      month: parts.find((part) => part.type === 'month')?.value || '',
+      monthNumber: Number(numericParts.find((part) => part.type === 'month')?.value || 0),
+      day: Number(parts.find((part) => part.type === 'day')?.value || 0),
+    };
+  }
+
+  function buildIslamicLabels(iso) {
+    const islamic = getIslamicParts(iso);
+    const labels = [];
+    const dayOfMonth = Number(iso.slice(8, 10));
+
+    if (dayOfMonth === 1) labels.push({ text: `${islamic.month} ${islamic.day}`, italic: true });
+    if (islamic.day === 1) labels.push({ text: `${islamic.month} 1`, italic: false });
+
+    const importantDay = islamicHolidayMap[`${islamic.monthNumber}-${islamic.day}`];
+    if (importantDay) labels.push({ text: importantDay, italic: false, important: true });
+
+    return labels;
+  }
+
   function applyDateStyles() {
     document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
       const iso = cell.dataset.date;
@@ -178,8 +220,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.longWeekends.includes(iso)) cell.classList.add('long-weekend');
       if (data.styles[iso]) cell.style.background = data.styles[iso];
       const holidayPill = cell.querySelector('.holiday-pill');
-      holidayPill.textContent = data.holidays[iso] || '';
+      const lines = [];
+      if (data.holidays[iso]) {
+        lines.push(`<span class="calendar-meta-line">${data.holidays[iso]}</span>`);
+      }
+      if (data.includeIslamic) {
+        buildIslamicLabels(iso).forEach((label) => {
+          lines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
+        });
+      }
+      holidayPill.innerHTML = lines.join('');
       holidayPill.classList.toggle('holiday-pill-long', Boolean(data.longWeekends.includes(iso)));
+      holidayPill.classList.toggle('has-content', lines.length > 0);
     });
   }
 
