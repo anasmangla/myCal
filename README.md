@@ -36,6 +36,11 @@ myCal/
 └── run.py
 ```
 
+
+## GitHub Pages / hosted demo
+
+The Flask app still runs locally for full server-backed development, but the repository root now also includes a standalone `index.html` + browser-side JavaScript entrypoint so `https://anasmangla.github.io/myCal/` opens an interactive calendar directly on GitHub Pages. Data on the hosted page is saved in the browser with `localStorage`, which makes it viewable without running Flask or SQLite locally.
+
 ## Setup
 
 ```bash
