@@ -1,0 +1,103 @@
+:root {
+  --weekend-bg: #f1f3f5;
+  --holiday-bg: #fef3c7;
+  --long-weekend-bg: #e8edf3;
+}
+body {
+  background: #f8fafc;
+}
+.app-shell {
+  max-width: 1500px;
+}
+.calendar-card {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.weekday-cell {
+  padding: .75rem;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+  font-weight: 600;
+  border-right: 1px solid rgba(255,255,255,.15);
+}
+.calendar-cell {
+  min-height: 180px;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  padding: .5rem;
+  background: white;
+}
+.calendar-cell.weekend {
+  background: var(--weekend-bg);
+}
+.calendar-cell.holiday {
+  background: var(--holiday-bg);
+}
+.calendar-cell.long-weekend {
+  background: var(--long-weekend-bg);
+}
+.calendar-cell.outside-month {
+  opacity: .55;
+}
+.calendar-cell-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: .5rem;
+}
+.day-number {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.event-chip {
+  display: block;
+  color: white;
+  border-radius: .5rem;
+  padding: .35rem .5rem;
+  margin-bottom: .35rem;
+  font-size: .78rem;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+.event-chip.holiday-chip {
+  background: #7c3aed !important;
+}
+.holiday-pill {
+  min-height: 1.25rem;
+  font-size: .7rem;
+  color: #6b7280;
+  margin-bottom: .4rem;
+}
+.holiday-pill-long {
+  color: #334155;
+  font-weight: 600;
+}
+.context-menu {
+  z-index: 2000;
+  min-width: 220px;
+}
+.selected-week .calendar-cell {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+@media print {
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .calendar-cell {
+    min-height: 140px;
+    break-inside: avoid;
+  }
+  body.print-week .week-row:not(.selected-week) {
+    display: none;
+  }
+}
