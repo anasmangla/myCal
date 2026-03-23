@@ -9,12 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
   const deleteForm = document.getElementById('deleteEventForm');
+  const titleDisplay = document.getElementById('calendarTitleDisplay');
+  const titleInput = document.getElementById('calendarTitleInput');
   let activeDate = null;
   let activeEventId = null;
 
   applyDateStyles();
   renderEvents();
   setupRowHighlighting();
+  setupCalendarTitle();
   setupPrintButtons();
   setupExportImage();
   setupContextMenus();
@@ -69,6 +72,62 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteForm.action = `/events/delete/${activeEventId}`;
     deleteForm.submit();
   });
+
+  function defaultCalendarTitle() {
+    return `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(data.selectedYear, data.selectedMonth - 1, 1)))} ${data.selectedYear} - Ahmadiyya Muslim Jamaat Buffalo`;
+  }
+
+  function calendarTitleStorageKey() {
+    return `mycal.title.${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}`;
+  }
+
+  function syncCalendarTitle(value) {
+    const nextValue = value.trim() || defaultCalendarTitle();
+    titleDisplay.textContent = nextValue;
+    titleInput.value = nextValue;
+    return nextValue;
+  }
+
+  function setupCalendarTitle() {
+    const storedTitle = window.localStorage.getItem(calendarTitleStorageKey());
+    syncCalendarTitle(storedTitle || defaultCalendarTitle());
+
+    const beginEditing = () => {
+      titleDisplay.classList.add('d-none');
+      titleInput.classList.remove('d-none');
+      titleInput.focus();
+      titleInput.select();
+    };
+
+    const finishEditing = () => {
+      const nextValue = syncCalendarTitle(titleInput.value);
+      window.localStorage.setItem(calendarTitleStorageKey(), nextValue);
+      titleInput.classList.add('d-none');
+      titleDisplay.classList.remove('d-none');
+    };
+
+    titleDisplay.addEventListener('click', beginEditing);
+    titleDisplay.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        beginEditing();
+      }
+    });
+    titleInput.addEventListener('blur', finishEditing);
+    titleInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finishEditing();
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        titleInput.value = titleDisplay.textContent;
+        titleInput.classList.add('d-none');
+        titleDisplay.classList.remove('d-none');
+        titleDisplay.focus();
+      }
+    });
+  }
 
   function currentMonthBounds() {
     const monthText = String(data.selectedMonth).padStart(2, '0');
