@@ -12,7 +12,7 @@ body {
 }
 
 .app-shell {
-  max-width: 1500px;
+  max-width: 1320px;
 }
 
 .toolbar-panel,
@@ -25,11 +25,15 @@ body {
 }
 
 .toolbar-panel {
-  padding: 1rem 1.25rem;
+  padding: 0.85rem 1rem;
 }
 
 .calendar-card {
   overflow: hidden;
+}
+
+.calendar-title {
+  padding: 0.85rem 1rem !important;
 }
 
 .calendar-title-editor {
@@ -37,7 +41,7 @@ body {
   justify-content: center;
   align-items: center;
   max-width: min(100%, 720px);
-  margin: 0 auto 0.25rem;
+  margin: 0 auto 0.15rem;
 }
 
 .calendar-title-editor .h4,
@@ -47,8 +51,9 @@ body {
 
 .calendar-title-editor .h4 {
   cursor: text;
-  padding: 0.15rem 0.5rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 0.5rem;
+  font-size: clamp(1rem, 1vw + 0.7rem, 1.35rem);
 }
 
 .calendar-title-editor .h4:hover,
@@ -68,19 +73,21 @@ body {
 }
 
 .weekday-cell {
-  padding: 0.75rem;
+  padding: 0.45rem 0.3rem;
   background: #0f172a;
   color: white;
   text-align: center;
   font-weight: 600;
+  font-size: clamp(0.7rem, 0.55vw + 0.45rem, 0.9rem);
+  line-height: 1.1;
   border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .calendar-cell {
-  min-height: 180px;
+  min-height: 128px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
-  padding: 0.65rem;
+  padding: 0.35rem;
   background: var(--surface);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -115,25 +122,42 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: start;
-  margin-bottom: 0.5rem;
+  gap: 0.2rem;
+  margin-bottom: 0.2rem;
+}
+
+.date-action-btn.btn.btn-sm {
+  --bs-btn-padding-y: 0.05rem;
+  --bs-btn-padding-x: 0.25rem;
+  --bs-btn-font-size: 0.7rem;
+  line-height: 1;
 }
 
 .day-number {
-  font-size: 1.15rem;
+  font-size: clamp(0.85rem, 0.7vw + 0.55rem, 1rem);
   font-weight: 700;
+  line-height: 1;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
 }
 
 .event-chip {
   display: block;
   color: white;
-  border-radius: 0.65rem;
-  padding: 0.4rem 0.55rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.78rem;
-  line-height: 1.25;
+  border-radius: 0.45rem;
+  padding: 0.18rem 0.32rem;
+  margin-bottom: 0;
+  font-size: clamp(0.57rem, 0.3vw + 0.48rem, 0.72rem);
+  line-height: 1.15;
   text-decoration: none;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .event-chip:hover {
@@ -146,10 +170,16 @@ body {
 }
 
 .holiday-pill {
-  min-height: 1.25rem;
-  font-size: 0.7rem;
+  min-height: 0;
+  font-size: clamp(0.54rem, 0.3vw + 0.46rem, 0.68rem);
+  line-height: 1.1;
   color: #6b7280;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.holiday-pill:empty {
+  display: none;
 }
 
 .holiday-pill-long {
@@ -203,17 +233,29 @@ body {
 
 @page {
   size: landscape;
-  margin: 0.45in;
+  margin: 0.3in;
 }
 
 @media print {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+  }
+
   body {
     background: white;
+    font-size: 10px;
   }
 
   .app-shell {
     max-width: none;
     width: 100%;
+    padding: 0 !important;
+  }
+
+  .container-fluid.py-4.app-shell {
+    padding: 0 !important;
   }
 
   .no-print {
@@ -231,8 +273,41 @@ body {
     width: 100%;
   }
 
+  .calendar-title {
+    padding: 0.3rem 0.4rem !important;
+  }
+
+  .weekday-cell {
+    padding: 0.18rem 0.12rem;
+    font-size: 8.5px;
+  }
+
   .calendar-cell {
-    min-height: 115px;
+    min-height: 94px;
+    padding: 0.18rem;
     break-inside: avoid;
+  }
+
+  .calendar-cell-header {
+    margin-bottom: 0.1rem;
+  }
+
+  .day-number {
+    font-size: 10px;
+  }
+
+  .holiday-pill,
+  .event-chip {
+    font-size: 7px;
+    line-height: 1.05;
+  }
+
+  .event-list {
+    gap: 0.1rem;
+  }
+
+  .event-chip {
+    padding: 0.1rem 0.18rem;
+    box-shadow: none;
   }
 }
