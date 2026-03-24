@@ -12,6 +12,7 @@ A local-first monthly calendar web app built with Flask, SQLite, SQLAlchemy, Boo
 - Event create/edit modal with multi-day labels, recurring events, and audience-based colors.
 - Custom date background colors stored per day.
 - Print month / selected week plus image export.
+- JSON export/import for full calendar data backup and restore.
 
 ## Project structure
 

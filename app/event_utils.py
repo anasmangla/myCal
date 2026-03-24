@@ -13,6 +13,7 @@ MAX_TITLE_LENGTH = 200
 MAX_LOCATION_LENGTH = 200
 MAX_NOTES_LENGTH = 5000
 VALID_WEEKDAY_VALUES = {str(index) for index in range(7)}
+VALID_HEX_DIGITS = set('0123456789abcdefABCDEF')
 
 
 class ValidationError(ValueError):
@@ -45,6 +46,7 @@ class EventPayload:
     location: str | None
     audience: str
     notes: str | None
+    color: str | None
     recurrence_type: str
     recurrence_weekdays: str
     labels: dict[int, str]
@@ -77,6 +79,15 @@ def sanitize_optional_text(raw_value: str | None, *, max_length: int) -> str | N
     return value
 
 
+def parse_optional_hex_color(raw_value: str | None, *, field_name: str) -> str | None:
+    value = (raw_value or '').strip()
+    if not value:
+        return None
+    if len(value) != 7 or not value.startswith('#') or any(char not in VALID_HEX_DIGITS for char in value[1:]):
+        raise ValidationError(f'{field_name} must be a valid hex color like #2563eb.')
+    return value.lower()
+
+
 def parse_month_scope(form: ImmutableMultiDict[str, str]) -> EventMonthScope:
     year = form.get('return_year', type=int)
     month = form.get('return_month', type=int)
@@ -105,6 +116,7 @@ def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
         location=sanitize_optional_text(form.get('location'), max_length=MAX_LOCATION_LENGTH),
         audience=(form.get('audience') or 'Unspecified').strip(),
         notes=sanitize_optional_text(form.get('notes'), max_length=MAX_NOTES_LENGTH),
+        color=parse_optional_hex_color(form.get('color'), field_name='Event color'),
         recurrence_type=recurrence_type,
         recurrence_weekdays=','.join(selected_weekdays) if recurrence_type == 'weekly' else '',
         labels=parse_day_labels(form),

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from io import BytesIO
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from . import db
 from .calendar_utils import (
@@ -69,6 +70,7 @@ def get_event(event_id: int):
             'location': event.location or '',
             'audience': event.audience,
             'notes': event.notes or '',
+            'color': event.color or '',
             'recurrence_type': event.recurrence_type,
             'recurrence_weekdays': event.recurrence_weekdays or '',
             'labels': labels,
@@ -96,6 +98,7 @@ def save_event():
         event.location = payload.location
         event.audience = payload.audience
         event.notes = payload.notes
+        event.color = payload.color
         event.recurrence_type = payload.recurrence_type
         event.recurrence_weekdays = payload.recurrence_weekdays
 
@@ -204,6 +207,90 @@ def clear_date_style():
     return jsonify({'status': 'ok', 'message': 'Custom date color cleared.'})
 
 
+@bp.get('/data/export')
+def export_data():
+    events = []
+    for event in Event.query.order_by(Event.start_date.asc(), Event.id.asc()).all():
+        events.append(
+            {
+                'title': event.title,
+                'start_date': event.start_date.isoformat(),
+                'end_date': event.end_date.isoformat(),
+                'start_time': event.start_time.strftime('%H:%M') if event.start_time else None,
+                'end_time': event.end_time.strftime('%H:%M') if event.end_time else None,
+                'all_day': bool(event.all_day),
+                'location': event.location,
+                'audience': event.audience,
+                'notes': event.notes,
+                'recurrence_type': event.recurrence_type,
+                'recurrence_weekdays': event.recurrence_weekdays,
+                'day_labels': [
+                    {'day_offset': label.day_offset, 'label': label.label}
+                    for label in sorted(event.day_labels, key=lambda item: item.day_offset)
+                ],
+            }
+        )
+
+    styles = [
+        {'day': style.day.isoformat(), 'background_color': style.background_color}
+        for style in DateStyle.query.order_by(DateStyle.day.asc()).all()
+    ]
+    payload = {
+        'version': 1,
+        'exported_at': datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
+        'events': events,
+        'date_styles': styles,
+    }
+    filename = f"mycal-export-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json"
+    content = json.dumps(payload, indent=2, ensure_ascii=False)
+    return send_file(
+        BytesIO(content.encode('utf-8')),
+        mimetype='application/json',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@bp.post('/data/import')
+def import_data():
+    upload = request.files.get('calendar_file')
+    if not upload or not upload.filename:
+        flash('Please choose a JSON file to import.', 'danger')
+        return redirect(_return_url())
+
+    try:
+        payload = json.loads(upload.read().decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        flash('Invalid JSON file. Please upload a valid myCal export file.', 'danger')
+        return redirect(_return_url())
+
+    try:
+        events_payload = payload.get('events', [])
+        styles_payload = payload.get('date_styles', [])
+        if not isinstance(events_payload, list) or not isinstance(styles_payload, list):
+            raise ValidationError('Import file must contain "events" and "date_styles" arrays.')
+
+        EventDayLabel.query.delete()
+        Event.query.delete()
+        DateStyle.query.delete()
+
+        for item in events_payload:
+            event = _build_event_from_import(item)
+            db.session.add(event)
+
+        for style_item in styles_payload:
+            style = _build_date_style_from_import(style_item)
+            db.session.add(style)
+
+        db.session.commit()
+        flash(f'Imported {len(events_payload)} events and {len(styles_payload)} date styles.', 'success')
+    except ValidationError as exc:
+        db.session.rollback()
+        flash(f'Import failed: {exc}', 'danger')
+
+    return redirect(_return_url())
+
+
 def _parse_day(raw_value: str | None):
     if not raw_value:
         raise ValidationError('Choose a valid calendar date.')
@@ -211,6 +298,16 @@ def _parse_day(raw_value: str | None):
         return datetime.strptime(raw_value, '%Y-%m-%d').date()
     except ValueError as exc:
         raise ValidationError('Choose a valid calendar date.') from exc
+
+
+def _parse_optional_time(raw_value):
+    value = (raw_value or '').strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%H:%M').time()
+    except ValueError as exc:
+        raise ValidationError(f'Invalid time value: {raw_value}') from exc
 
 
 def _validate_color(raw_value: str | None) -> str:
@@ -234,6 +331,7 @@ def _clone_event(source: Event) -> Event:
         location=source.location,
         audience=source.audience,
         notes=source.notes,
+        color=source.color,
         recurrence_type=source.recurrence_type,
         recurrence_weekdays=source.recurrence_weekdays,
     )
@@ -279,6 +377,73 @@ def _delete_single_occurrence(event: Event, occurrence_day):
         return
 
     db.session.delete(event)
+def _build_event_from_import(item):
+    if not isinstance(item, dict):
+        raise ValidationError('Each event must be an object.')
+
+    title = (item.get('title') or '').strip()
+    if not title:
+        raise ValidationError('Every event must include a title.')
+
+    start_date = _parse_day(item.get('start_date'))
+    end_date = _parse_day(item.get('end_date'))
+    if end_date < start_date:
+        raise ValidationError(f'Event "{title}" has an end date before its start date.')
+
+    recurrence_type = (item.get('recurrence_type') or 'none').strip().lower()
+    if recurrence_type not in RECURRENCE_CHOICES:
+        raise ValidationError(f'Event "{title}" has an invalid recurrence type: {recurrence_type}.')
+
+    audience = (item.get('audience') or 'Unspecified').strip()
+    if audience not in AUDIENCE_CHOICES:
+        audience = 'Unspecified'
+
+    recurrence_weekdays = (item.get('recurrence_weekdays') or '').strip()
+    if recurrence_weekdays:
+        allowed_weekdays = {str(day) for day, _ in WEEKDAY_CHOICES}
+        weekdays = {day.strip() for day in recurrence_weekdays.split(',') if day.strip()}
+        if any(day not in allowed_weekdays for day in weekdays):
+            raise ValidationError(f'Event "{title}" has invalid recurrence weekdays.')
+        recurrence_weekdays = ','.join(sorted(weekdays, key=int))
+
+    event = Event(
+        title=title[:200],
+        start_date=start_date,
+        end_date=end_date,
+        start_time=_parse_optional_time(item.get('start_time')),
+        end_time=_parse_optional_time(item.get('end_time')),
+        all_day=bool(item.get('all_day')),
+        location=((item.get('location') or '').strip() or None),
+        audience=audience,
+        notes=((item.get('notes') or '').strip() or None),
+        recurrence_type=recurrence_type,
+        recurrence_weekdays=recurrence_weekdays or None,
+    )
+
+    labels = item.get('day_labels', [])
+    if labels and not isinstance(labels, list):
+        raise ValidationError(f'Event "{title}" has invalid day_labels data.')
+    for label_item in labels:
+        if not isinstance(label_item, dict):
+            raise ValidationError(f'Event "{title}" has an invalid day label.')
+        try:
+            offset = int(label_item.get('day_offset'))
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f'Event "{title}" has a day label with invalid offset.') from exc
+        label_text = (label_item.get('label') or '').strip()
+        if not label_text:
+            continue
+        event.day_labels.append(EventDayLabel(day_offset=offset, label=label_text[:200]))
+
+    return event
+
+
+def _build_date_style_from_import(item):
+    if not isinstance(item, dict):
+        raise ValidationError('Each date style must be an object.')
+    day = _parse_day(item.get('day'))
+    color = _validate_color(item.get('background_color'))
+    return DateStyle(day=day, background_color=color)
 
 
 def _return_url():

@@ -43,6 +43,12 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="exportImageBtn">
           <i class="bi bi-image me-1" aria-hidden="true"></i>Export image
         </button>
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_data') }}">
+          <i class="bi bi-download me-1" aria-hidden="true"></i>Export JSON
+        </a>
+        <button class="btn btn-outline-success btn-sm" type="button" id="importJsonBtn">
+          <i class="bi bi-upload me-1" aria-hidden="true"></i>Import JSON
+        </button>
       </div>
     </div>
   </div>
@@ -120,6 +126,7 @@
             <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"></div>
             <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" name="end_time" id="endTime"></div>
             <div class="col-md-3"><label class="form-label">Audience</label><select class="form-select" name="audience" id="audience">{% for audience in audience_choices %}<option value="{{ audience }}">{{ audience }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="form-label">Event color</label><input type="color" class="form-control form-control-color w-100" name="color" id="eventColor" value="#4b5563"><div class="form-text">Optional override for event chip color.</div></div>
             <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" id="location" maxlength="200"></div>
             <div class="col-md-3"><label class="form-label">Recurrence</label><select class="form-select" name="recurrence_type" id="recurrenceType">{% for recurrence in recurrence_choices %}<option value="{{ recurrence }}">{{ recurrence.title() }}</option>{% endfor %}</select></div>
             <div class="col-md-12" id="weeklyOptions"><label class="form-label">Weekly recurrence weekdays</label><div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div><div class="form-text">Pick one or more weekdays when using weekly recurrence.</div></div>
@@ -169,6 +176,13 @@
   <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
   <input type="hidden" name="target_date" id="eventActionTargetDate">
   <input type="hidden" name="anchor_date" id="eventActionAnchorDate">
+</form>
+<form method="post" action="{{ url_for('calendar.import_data') }}" id="importDataForm" class="d-none" enctype="multipart/form-data">
+  <input type="hidden" name="return_year" value="{{ selected_year }}">
+  <input type="hidden" name="return_month" value="{{ selected_month }}">
+  <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="file" name="calendar_file" id="importDataFileInput" accept=".json,application/json">
 </form>
 <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
 {% endblock %}
