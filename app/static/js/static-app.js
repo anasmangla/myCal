@@ -494,13 +494,13 @@ function renderCalendar() {
     row.classList.toggle('outside-month-row', inMonthCount === 0);
     body.appendChild(row);
   });
-  updatePrintMetrics();
+  if (window.matchMedia('print').matches) prepareForPrint(printState.mode);
 }
 
 function setSelectedWeek(index) {
   view.selectedWeekIndex = Number(index);
   document.querySelectorAll('.week-row').forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(view.selectedWeekIndex)));
-  updatePrintMetrics(printState.mode);
+  if (window.matchMedia('print').matches) prepareForPrint(printState.mode);
 }
 
 function openEventModal(payload) {
@@ -694,47 +694,52 @@ function pxPerInch() {
   return pixels;
 }
 
-function getVisiblePrintRows(mode = printState.mode) {
-  const rows = Array.from(document.querySelectorAll('#calendarBody .week-row')).filter((row) => Number(row.dataset.inMonthCount || 0) > 0);
-  return rows;
-}
+function applyPrintScale() {
+  const container = document.getElementById('printContainer');
+  const calendar = document.getElementById('calendarCapture');
+  if (!container || !calendar) return 1;
 
-function markPrintTargetWeek() {
-  document.querySelectorAll('#calendarBody .week-row').forEach((row) => {
-    row.classList.toggle('print-target-week', row.dataset.weekIndex === String(view.selectedWeekIndex));
-  });
-}
+  const marginInches = 0.5;
+  const pageWidth = (8.5 - (marginInches * 2)) * pxPerInch();
+  const pageHeight = (11 - (marginInches * 2)) * pxPerInch();
 
-function updatePrintMetrics(mode = printState.mode) {
-  markPrintTargetWeek();
-  const root = document.documentElement;
-  const visibleRows = getVisiblePrintRows(mode);
-  const rowCount = Math.max(visibleRows.length, 1);
-  const marginInches = 0.35;
-  const printableHeight = (11 - (marginInches * 2)) * pxPerInch();
-  const titleHeight = document.querySelector('.calendar-title')?.getBoundingClientRect().height || 0;
-  const weekdayHeight = document.getElementById('weekdayHeader')?.getBoundingClientRect().height || 0;
-  const cardBody = document.querySelector('.calendar-card .card-body');
-  const cardBodyStyles = cardBody ? window.getComputedStyle(cardBody) : null;
-  const bodyPadding = cardBodyStyles
-    ? (parseFloat(cardBodyStyles.paddingTop) + parseFloat(cardBodyStyles.paddingBottom))
-    : 0;
-  const availableBodyHeight = Math.max(printableHeight - titleHeight - weekdayHeight - bodyPadding - 8, 0);
-  const minRowHeight = 1.05 * pxPerInch();
-  const computedRowHeight = Math.max(minRowHeight, Math.floor(availableBodyHeight / rowCount));
-  root.style.setProperty('--print-visible-weeks', String(rowCount));
-  root.style.setProperty('--print-week-row-height', `${computedRowHeight}px`);
-  root.style.setProperty('--print-calendar-grid-height', `${computedRowHeight * rowCount}px`);
+  const currentTransform = calendar.style.transform;
+  calendar.style.transform = 'none';
+  calendar.style.transformOrigin = 'top left';
+
+  const calendarRect = calendar.getBoundingClientRect();
+  const scale = Math.min(pageWidth / calendarRect.width, pageHeight / calendarRect.height);
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+  document.documentElement.style.setProperty('--print-scale', String(safeScale));
+  calendar.style.transform = `scale(${safeScale})`;
+  calendar.style.transformOrigin = 'top left';
+  container.style.height = `${calendarRect.height * safeScale}px`;
+
+  printState.scale = safeScale;
+  printState.mode = 'month';
+  if (currentTransform && currentTransform !== 'none') {
+    printState.previousTransform = currentTransform;
+  }
+  return safeScale;
 }
 
 function prepareForPrint(mode) {
-  printState.mode = 'month';
-  updatePrintMetrics(printState.mode);
+  printState.mode = mode || 'month';
+  applyPrintScale();
 }
 
 function resetPrintLayout() {
+  const container = document.getElementById('printContainer');
+  const calendar = document.getElementById('calendarCapture');
+  if (calendar) {
+    calendar.style.transform = '';
+    calendar.style.transformOrigin = '';
+  }
+  if (container) container.style.height = '';
+  document.documentElement.style.removeProperty('--print-scale');
+  printState.scale = 1;
   printState.mode = 'month';
-  updatePrintMetrics('month');
 }
 
 function bindUI() {
@@ -762,7 +767,8 @@ function bindUI() {
     try {
       document.body.classList.add('exporting-calendar');
       const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
-      const calendarNode = document.getElementById('calendarCapture');
+      prepareForPrint(printState.mode);
+      const calendarNode = document.getElementById('printContainer');
       const canvas = await html2canvas(calendarNode, { backgroundColor: '#ffffff', scale: Math.max(window.devicePixelRatio || 1, 2), useCORS: true, logging: false, width: calendarNode.scrollWidth, height: calendarNode.scrollHeight, windowWidth: Math.max(document.documentElement.clientWidth, 1600) });
       const link = document.createElement('a');
       link.download = `calendar-${view.year}-${String(view.month).padStart(2, '0')}.png`;
@@ -772,6 +778,7 @@ function bindUI() {
       flash('Export failed. Please try again after the calendar fully loads.', 'danger');
     } finally {
       document.body.classList.remove('exporting-calendar');
+      resetPrintLayout();
     }
   });
   document.getElementById('clearStorageBtn').addEventListener('click', () => {
@@ -857,7 +864,7 @@ function bindUI() {
   });
 
   ['click', 'scroll', 'resize'].forEach((eventName) => window.addEventListener(eventName, hideMenus, { passive: true }));
-  window.addEventListener('resize', () => updatePrintMetrics(printState.mode), { passive: true });
+  window.addEventListener('resize', () => { if (window.matchMedia('print').matches) prepareForPrint(printState.mode); }, { passive: true });
   window.addEventListener('beforeprint', () => prepareForPrint(printState.mode));
   window.addEventListener('afterprint', resetPrintLayout);
   document.addEventListener('keydown', (event) => {

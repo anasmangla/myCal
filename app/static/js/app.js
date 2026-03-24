@@ -312,10 +312,63 @@ document.addEventListener('DOMContentLoaded', () => {
     targetCell.setAttribute('aria-selected', 'true');
   }
 
+  function pxPerInch() {
+    const probe = document.createElement('div');
+    probe.style.width = '1in';
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const pixels = probe.getBoundingClientRect().width || 96;
+    probe.remove();
+    return pixels;
+  }
+
+  function applyPrintScale() {
+    const container = document.getElementById('printContainer');
+    const calendar = document.getElementById('calendarCapture');
+    if (!container || !calendar) return;
+
+    const marginInches = 0.5;
+    const pageWidth = (8.5 - (marginInches * 2)) * pxPerInch();
+    const pageHeight = (11 - (marginInches * 2)) * pxPerInch();
+
+    calendar.style.transform = 'none';
+    calendar.style.transformOrigin = 'top left';
+
+    const rect = calendar.getBoundingClientRect();
+    const scale = Math.min(pageWidth / rect.width, pageHeight / rect.height);
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+    document.documentElement.style.setProperty('--print-scale', String(safeScale));
+    calendar.style.transform = `scale(${safeScale})`;
+    calendar.style.transformOrigin = 'top left';
+    container.style.height = `${rect.height * safeScale}px`;
+  }
+
+  function resetPrintScale() {
+    const container = document.getElementById('printContainer');
+    const calendar = document.getElementById('calendarCapture');
+    if (calendar) {
+      calendar.style.transform = '';
+      calendar.style.transformOrigin = '';
+    }
+    if (container) container.style.height = '';
+    document.documentElement.style.removeProperty('--print-scale');
+  }
+
   function setupPrintButtons() {
     document.querySelectorAll('[data-print-mode]').forEach((button) => {
-      button.addEventListener('click', () => window.print());
+      button.addEventListener('click', () => {
+        applyPrintScale();
+        window.print();
+      });
     });
+
+    window.addEventListener('beforeprint', applyPrintScale);
+    window.addEventListener('afterprint', resetPrintScale);
+    window.addEventListener('resize', () => {
+      if (window.matchMedia('print').matches) applyPrintScale();
+    }, { passive: true });
   }
 
   function setupExportImage() {
@@ -324,7 +377,8 @@ document.addEventListener('DOMContentLoaded', () => {
         validationEl.classList.add('d-none');
         document.body.classList.add('exporting-calendar');
         const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
-        const calendarNode = document.getElementById('calendarCapture');
+        applyPrintScale();
+        const calendarNode = document.getElementById('printContainer');
         const canvas = await html2canvas(calendarNode, {
           backgroundColor: '#ffffff',
           scale: Math.max(window.devicePixelRatio || 1, 2),
@@ -342,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showValidation('Export failed. Please try again after the calendar fully loads.');
       } finally {
         document.body.classList.remove('exporting-calendar');
+        resetPrintScale();
       }
     });
   }
