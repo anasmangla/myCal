@@ -179,6 +179,21 @@ body {
   width: 100%;
 }
 
+.outside-month-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 0.4rem;
+}
+
+.outside-month-logo {
+  width: min(100%, 120px);
+  max-height: 120px;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
 .calendar-cell-header {
   display: flex;
   justify-content: space-between;

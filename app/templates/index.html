@@ -46,6 +46,7 @@
       </div>
     </div>
   </div>
+  {% set ns = namespace(logo_placed=false, seen_in_month=false) %}
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
   <div class="mb-3 no-print">
