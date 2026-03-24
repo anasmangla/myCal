@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
+  const hiddenMeta = loadHiddenMeta();
 
   applyDateStyles();
   renderEvents();
@@ -61,6 +62,20 @@ document.addEventListener('DOMContentLoaded', () => {
     hideMenus();
     const result = await saveDateStyle('/date-style/clear', { day: activeDate });
     if (result.ok) window.location.reload();
+  });
+
+  document.getElementById('contextToggleHoliday').addEventListener('click', () => {
+    if (!activeDate) return;
+    hideMenus();
+    toggleHiddenMeta('holidays', activeDate);
+    renderCalendarDecorations();
+  });
+
+  document.getElementById('contextToggleIslamic').addEventListener('click', () => {
+    if (!activeDate) return;
+    hideMenus();
+    toggleHiddenMeta('islamic', activeDate);
+    renderCalendarDecorations();
   });
 
   colorPicker.addEventListener('input', async () => {
@@ -145,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const items = data.events[date] || [];
       container.innerHTML = '';
       items.forEach((item) => {
+        if (item.is_holiday && isHiddenMeta('holidays', date)) return;
         const chip = document.createElement('a');
         chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
         chip.textContent = item.display_text;
@@ -253,16 +269,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const iso = cell.dataset.date;
       const day = new Date(`${iso}T00:00:00`);
       const jsDay = day.getUTCDay();
+      const showHoliday = Boolean(data.holidays[iso]) && !isHiddenMeta('holidays', iso);
+      const showIslamic = Boolean(data.includeIslamic) && !isHiddenMeta('islamic', iso);
       if (jsDay === 0 || jsDay === 6) cell.classList.add('weekend');
-      if (data.holidays[iso]) cell.classList.add('holiday');
+      cell.classList.toggle('holiday', showHoliday);
       if (data.longWeekends.includes(iso)) cell.classList.add('long-weekend');
       if (data.styles[iso]) cell.style.background = data.styles[iso];
       const holidayPill = cell.querySelector('.holiday-pill');
       const lines = [];
-      if (data.holidays[iso]) {
+      if (showHoliday) {
         lines.push(`<span class="calendar-meta-line">${data.holidays[iso]}</span>`);
       }
-      if (data.includeIslamic) {
+      if (showIslamic) {
         buildIslamicLabels(iso).forEach((label) => {
           lines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
         });
@@ -496,6 +514,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showMenu(menu, x, y) {
     hideMenus();
+    if (menu === dateMenu) {
+      syncDateMenuLabels();
+    }
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.classList.remove('d-none');
@@ -552,5 +573,58 @@ document.addEventListener('DOMContentLoaded', () => {
   function showValidation(message) {
     validationEl.textContent = message;
     validationEl.classList.remove('d-none');
+  }
+
+  function hiddenMetaStorageKey() {
+    return `mycal.hiddenMeta.${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}`;
+  }
+
+  function loadHiddenMeta() {
+    try {
+      const raw = window.localStorage.getItem(hiddenMetaStorageKey());
+      const parsed = raw ? JSON.parse(raw) : {};
+      const holidays = Array.isArray(parsed.holidays) ? parsed.holidays.filter((value) => typeof value === 'string') : [];
+      const islamic = Array.isArray(parsed.islamic) ? parsed.islamic.filter((value) => typeof value === 'string') : [];
+      return { holidays: new Set(holidays), islamic: new Set(islamic) };
+    } catch (error) {
+      return { holidays: new Set(), islamic: new Set() };
+    }
+  }
+
+  function persistHiddenMeta() {
+    const payload = {
+      holidays: Array.from(hiddenMeta.holidays),
+      islamic: Array.from(hiddenMeta.islamic),
+    };
+    window.localStorage.setItem(hiddenMetaStorageKey(), JSON.stringify(payload));
+  }
+
+  function isHiddenMeta(type, iso) {
+    return hiddenMeta[type].has(iso);
+  }
+
+  function toggleHiddenMeta(type, iso) {
+    if (hiddenMeta[type].has(iso)) hiddenMeta[type].delete(iso);
+    else hiddenMeta[type].add(iso);
+    persistHiddenMeta();
+  }
+
+  function syncDateMenuLabels() {
+    const holidayButton = document.getElementById('contextToggleHoliday');
+    const islamicButton = document.getElementById('contextToggleIslamic');
+    const hasHoliday = Boolean(activeDate && data.holidays[activeDate]);
+    const hasIslamic = Boolean(activeDate && data.includeIslamic);
+    const holidayHidden = Boolean(activeDate && isHiddenMeta('holidays', activeDate));
+    const islamicHidden = Boolean(activeDate && isHiddenMeta('islamic', activeDate));
+
+    holidayButton.disabled = !hasHoliday;
+    islamicButton.disabled = !hasIslamic;
+    holidayButton.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
+    islamicButton.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
+  }
+
+  function renderCalendarDecorations() {
+    applyDateStyles();
+    renderEvents();
   }
 });

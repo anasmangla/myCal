@@ -162,7 +162,7 @@ function loadState() {
   } catch (error) {
     console.warn('Unable to load myCal state', error);
   }
-  return { events: [], styles: {}, includeHolidays: true, includeIslamic: false, nextId: 1 };
+  return { events: [], styles: {}, includeHolidays: true, includeIslamic: false, hiddenMeta: { holidays: [], islamic: [] }, nextId: 1 };
 }
 
 function saveState() {
@@ -256,6 +256,11 @@ function getVisibleEvents(visibleStartIso, visibleEndIso) {
 }
 
 const state = loadState();
+state.hiddenMeta ||= {};
+state.hiddenMeta.holidays = Array.isArray(state.hiddenMeta.holidays) ? state.hiddenMeta.holidays : [];
+state.hiddenMeta.islamic = Array.isArray(state.hiddenMeta.islamic) ? state.hiddenMeta.islamic : [];
+const hiddenHolidays = new Set(state.hiddenMeta.holidays);
+const hiddenIslamic = new Set(state.hiddenMeta.islamic);
 const defaults = firstVisibleMonth();
 const view = {
   year: defaults.year,
@@ -414,7 +419,9 @@ function renderCalendar() {
       if (inMonth) inMonthCount += 1;
       if (day.getUTCDay() === 0 || day.getUTCDay() === 6) cell.classList.add('weekend');
       if (!inMonth) cell.classList.add('outside-month');
-      if (holidayMap.has(key)) cell.classList.add('holiday');
+      const showHoliday = holidayMap.has(key) && !hiddenHolidays.has(key);
+      const showIslamic = state.includeIslamic === true && !hiddenIslamic.has(key);
+      if (showHoliday) cell.classList.add('holiday');
       if (longWeekends.has(key)) cell.classList.add('long-weekend');
       if (state.styles[key]) cell.style.background = state.styles[key];
       cell.dataset.date = key;
@@ -429,8 +436,8 @@ function renderCalendar() {
       }
 
       const metaLines = [];
-      if (holidayMap.has(key)) metaLines.push(`<span class="calendar-meta-line">${holidayMap.get(key)}</span>`);
-      if (state.includeIslamic === true) {
+      if (showHoliday) metaLines.push(`<span class="calendar-meta-line">${holidayMap.get(key)}</span>`);
+      if (showIslamic) {
         buildIslamicLabels(day).forEach((label) => {
           metaLines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
         });
@@ -455,6 +462,7 @@ function renderCalendar() {
 
       const list = cell.querySelector('.event-list');
       (occurrences[key] || []).forEach((item) => {
+        if (item.is_holiday && hiddenHolidays.has(key)) return;
         const chip = document.createElement('a');
         chip.href = '#';
         chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
@@ -661,6 +669,7 @@ function deleteEvent(id) {
 
 function showMenu(menu, x, y) {
   hideMenus();
+  if (menu.id === 'dateContextMenu') syncDateMenuLabels();
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
   menu.classList.remove('d-none');
@@ -772,6 +781,9 @@ function bindUI() {
     state.includeHolidays = true;
     state.nextId = 1;
     state.includeIslamic = false;
+    state.hiddenMeta = { holidays: [], islamic: [] };
+    hiddenHolidays.clear();
+    hiddenIslamic.clear();
     document.getElementById('islamicToggle').checked = false;
     document.getElementById('holidaysToggle').checked = true;
     renderCalendar();
@@ -814,6 +826,18 @@ function bindUI() {
       flash('Custom date color cleared.');
     }
   });
+  document.getElementById('contextToggleHoliday').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDate) return;
+    toggleHiddenMeta('holidays', activeDate);
+    renderCalendar();
+  });
+  document.getElementById('contextToggleIslamic').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDate) return;
+    toggleHiddenMeta('islamic', activeDate);
+    renderCalendar();
+  });
   document.getElementById('dateColorPicker').addEventListener('input', (event) => {
     if (activeDate) {
       state.styles[activeDate] = event.target.value;
@@ -848,3 +872,29 @@ document.addEventListener('DOMContentLoaded', () => {
   bindUI();
   renderCalendar();
 });
+
+function persistHiddenMeta() {
+  state.hiddenMeta = {
+    holidays: Array.from(hiddenHolidays),
+    islamic: Array.from(hiddenIslamic),
+  };
+  saveState();
+}
+
+function toggleHiddenMeta(type, iso) {
+  const target = type === 'holidays' ? hiddenHolidays : hiddenIslamic;
+  if (target.has(iso)) target.delete(iso);
+  else target.add(iso);
+  persistHiddenMeta();
+}
+
+function syncDateMenuLabels() {
+  const holidayButton = document.getElementById('contextToggleHoliday');
+  const islamicButton = document.getElementById('contextToggleIslamic');
+  const hasHoliday = Boolean(activeDate && state.includeHolidays !== false && getUSHolidays(view.year, view.month).has(activeDate));
+  const hasIslamic = Boolean(activeDate && state.includeIslamic === true);
+  holidayButton.disabled = !hasHoliday;
+  islamicButton.disabled = !hasIslamic;
+  holidayButton.textContent = hiddenHolidays.has(activeDate) ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
+  islamicButton.textContent = hiddenIslamic.has(activeDate) ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
+}
