@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flask import Flask
+from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 
 
@@ -32,5 +33,16 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_schema_updates()
 
     return app
+
+
+def _ensure_schema_updates() -> None:
+    event_columns = {
+        row[1]
+        for row in db.session.execute(text('PRAGMA table_info(event)')).all()
+    }
+    if 'color' not in event_columns:
+        db.session.execute(text('ALTER TABLE event ADD COLUMN color VARCHAR(7)'))
+        db.session.commit()

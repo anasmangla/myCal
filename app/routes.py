@@ -68,6 +68,7 @@ def get_event(event_id: int):
             'location': event.location or '',
             'audience': event.audience,
             'notes': event.notes or '',
+            'color': event.color or '',
             'recurrence_type': event.recurrence_type,
             'recurrence_weekdays': event.recurrence_weekdays or '',
             'labels': labels,
@@ -95,6 +96,7 @@ def save_event():
         event.location = payload.location
         event.audience = payload.audience
         event.notes = payload.notes
+        event.color = payload.color
         event.recurrence_type = payload.recurrence_type
         event.recurrence_weekdays = payload.recurrence_weekdays
 
@@ -212,6 +214,7 @@ def _clone_event(source: Event) -> Event:
         location=source.location,
         audience=source.audience,
         notes=source.notes,
+        color=source.color,
         recurrence_type=source.recurrence_type,
         recurrence_weekdays=source.recurrence_weekdays,
     )
