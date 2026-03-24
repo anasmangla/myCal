@@ -67,7 +67,7 @@
       <div class="calendar-grid-wrapper">
         <div class="calendar-grid weekdays">
           {% for weekday in weekday_names %}
-          <div class="weekday-cell">{{ weekday }}</div>
+          <div class="weekday-cell">{{ weekday[:3]|upper }}</div>
           {% endfor %}
         </div>
         {% for week in grid %}
