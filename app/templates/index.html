@@ -46,6 +46,7 @@
       </div>
     </div>
   </div>
+  {% set ns = namespace(logo_placed=false, seen_in_month=false) %}
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
   <div class="mb-3 no-print">
@@ -77,6 +78,9 @@
           {% for day in week %}
           {% set iso = day.isoformat() %}
           {% set in_month = day.month == selected_month %}
+          {% if in_month %}{% set ns.seen_in_month = true %}{% endif %}
+          {% set is_last_grid_cell = loop.last and loop.parent.last %}
+          {% set place_logo = (not in_month) and (not ns.logo_placed) and ((not ns.seen_in_month) or is_last_grid_cell) %}
           <div class="calendar-cell {% if not in_month %}outside-month{% endif %}" data-date="{{ iso }}" data-in-month="{{ "true" if in_month else "false" }}">
             {% if in_month %}
             <div class="calendar-cell-header">
@@ -87,6 +91,11 @@
             </div>
             <div class="holiday-pill small"></div>
             <div class="event-list" data-events-for="{{ iso }}"></div>
+            {% elif place_logo %}
+            {% set ns.logo_placed = true %}
+            <div class="outside-month-fill outside-month-logo-wrap">
+              <img src="{{ url_for('static', filename='img/ahmadiyya-logo.svg') }}" class="outside-month-logo" alt="Ahmadiyya logo" loading="lazy">
+            </div>
             {% else %}
             <div class="outside-month-fill" aria-hidden="true"></div>
             {% endif %}

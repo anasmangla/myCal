@@ -407,6 +407,9 @@ function renderCalendar() {
   const body = document.getElementById('calendarBody');
   body.innerHTML = '';
 
+  let logoPlaced = false;
+  let seenInMonth = false;
+
   grid.forEach((week, weekIndex) => {
     const row = document.createElement('div');
     row.className = `calendar-grid week-row ${weekIndex === view.selectedWeekIndex ? 'selected-week' : ''}`;
@@ -414,12 +417,17 @@ function renderCalendar() {
     row.addEventListener('click', () => setSelectedWeek(weekIndex));
     let inMonthCount = 0;
 
-    week.forEach((day) => {
+    week.forEach((day, dayIndex) => {
       const key = isoDate(day);
       const cell = document.createElement('div');
       cell.className = 'calendar-cell';
       const inMonth = day.getUTCMonth() === view.month - 1;
-      if (inMonth) inMonthCount += 1;
+      if (inMonth) {
+        inMonthCount += 1;
+        seenInMonth = true;
+      }
+      const isLastGridCell = weekIndex === grid.length - 1 && dayIndex === week.length - 1;
+      const placeLogo = !inMonth && !logoPlaced && (!seenInMonth || isLastGridCell);
       if (day.getUTCDay() === 0 || day.getUTCDay() === 6) cell.classList.add('weekend');
       if (!inMonth) cell.classList.add('outside-month');
       const showHoliday = holidayMap.has(key) && !hiddenHolidays.has(key);
@@ -445,14 +453,25 @@ function renderCalendar() {
           metaLines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
         });
       }
-      cell.innerHTML = inMonth ? `
-        <div class="calendar-cell-header">
-          <button type="button" class="btn btn-sm btn-light date-action-btn no-print" aria-label="Date actions">⋮</button>
-          <div><div class="day-number">${day.getUTCDate()}</div></div>
-        </div>
-        <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''} ${metaLines.length ? 'has-content' : ''}">${metaLines.join('')}</div>
-        <div class="event-list"></div>
-      ` : '<div class="outside-month-fill" aria-hidden="true"></div>';
+      if (inMonth) {
+        cell.innerHTML = `
+          <div class="calendar-cell-header">
+            <button type="button" class="btn btn-sm btn-light date-action-btn no-print" aria-label="Date actions">⋮</button>
+            <div><div class="day-number">${day.getUTCDate()}</div></div>
+          </div>
+          <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''} ${metaLines.length ? 'has-content' : ''}">${metaLines.join('')}</div>
+          <div class="event-list"></div>
+        `;
+      } else if (placeLogo) {
+        logoPlaced = true;
+        cell.innerHTML = `
+          <div class="outside-month-fill outside-month-logo-wrap">
+            <img src="app/static/img/ahmadiyya-logo.svg" class="outside-month-logo" alt="Ahmadiyya logo" loading="lazy">
+          </div>
+        `;
+      } else {
+        cell.innerHTML = '<div class="outside-month-fill" aria-hidden="true"></div>';
+      }
 
       if (inMonth) {
         cell.querySelector('.date-action-btn').addEventListener('click', () => openEventModal({ start_date: key, end_date: key }));
