@@ -130,7 +130,9 @@ def event_label_map(event: Event) -> dict[int, str]:
     return {item.day_offset: item.label for item in event.day_labels}
 
 
-def occurrence_color(audience: str) -> str:
+def occurrence_color(audience: str, custom_color: str | None = None) -> str:
+    if custom_color:
+        return custom_color
     return AUDIENCE_COLORS.get(audience, AUDIENCE_COLORS['Unspecified'])
 
 
@@ -146,7 +148,7 @@ def build_occurrence(event: Event, current_day: date, label: str) -> Occurrence:
         end_time=format_time(event.end_time),
         all_day=event.all_day,
         audience=event.audience,
-        color=occurrence_color(event.audience),
+        color=occurrence_color(event.audience, event.color),
         location=event.location,
         notes=event.notes,
     )

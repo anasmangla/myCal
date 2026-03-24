@@ -16,6 +16,7 @@ class Event(db.Model):
     location = db.Column(db.String(200), nullable=True)
     audience = db.Column(db.String(50), nullable=False, default='Unspecified')
     notes = db.Column(db.Text, nullable=True)
+    color = db.Column(db.String(7), nullable=True)
     recurrence_type = db.Column(db.String(20), nullable=False, default='none')
     recurrence_weekdays = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())

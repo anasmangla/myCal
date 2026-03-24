@@ -1,5 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
   const data = window.CALENDAR_DATA;
+  const audienceColors = {
+    Lajna: '#b03060',
+    Nasirat: '#f4a6c1',
+    Ansar: '#1d4e89',
+    Khuddam: '#1f3a5f',
+    Atfal: '#75b8ff',
+    'Tahir Academy': '#2f855a',
+    All: '#1f2937',
+    Unspecified: '#4b5563',
+  };
   const eventModalEl = document.getElementById('eventModal');
   const eventModal = new bootstrap.Modal(eventModalEl);
   const eventForm = document.getElementById('eventForm');
@@ -487,6 +497,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setupFormBehavior() {
+    const audienceField = document.getElementById('audience');
+    const eventColorField = document.getElementById('eventColor');
+
+    audienceField.addEventListener('change', () => {
+      if (eventColorField.dataset.touched === 'true') return;
+      eventColorField.value = colorForAudience(audienceField.value);
+    });
+    eventColorField.addEventListener('input', () => {
+      eventColorField.dataset.touched = 'true';
+    });
+
     document.getElementById('recurrenceType').addEventListener('change', () => {
       syncRecurringEndDate();
       toggleWeeklyOptions();
@@ -522,6 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('allDay').checked = Boolean(payload.all_day);
     document.getElementById('location').value = payload.location || '';
     document.getElementById('audience').value = payload.audience || 'Unspecified';
+    const eventColorField = document.getElementById('eventColor');
+    eventColorField.dataset.touched = payload.color ? 'true' : 'false';
+    eventColorField.value = payload.color || colorForAudience(document.getElementById('audience').value);
     document.getElementById('notes').value = payload.notes || '';
     document.getElementById('recurrenceType').value = payload.recurrence_type || 'none';
     document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
@@ -532,6 +556,10 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleWeeklyOptions();
     buildDayLabels(payload.labels || {});
     eventModal.show();
+  }
+
+  function colorForAudience(audience) {
+    return audienceColors[audience] || audienceColors.Unspecified;
   }
 
   function syncRecurringEndDate(preserveExistingRange = false) {
