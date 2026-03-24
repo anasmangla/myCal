@@ -736,6 +736,84 @@ function deleteEvent(id) {
   flash('Event deleted.', 'success');
 }
 
+function askDeleteMode() {
+  const deleteOne = window.confirm(
+    'This is a recurring event.\n\nPress OK to delete only this occurrence.\nPress Cancel to choose another option.'
+  );
+  if (deleteOne) return 'single';
+  const deleteAll = window.confirm('Delete all occurrences in this recurring event series?');
+  return deleteAll ? 'all' : '';
+}
+
+function isWeeklyOccurrenceMatch(event, occurrenceDate) {
+  const jsWeekday = String((parseIsoDate(occurrenceDate).getUTCDay()) % 7);
+  const weekdays = new Set((event.recurrence_weekdays || '').split(',').filter(Boolean));
+  return weekdays.has(jsWeekday);
+}
+
+function deleteSingleOccurrence(event, occurrenceDate) {
+  const beforeDay = parseIsoDate(occurrenceDate);
+  const afterDay = parseIsoDate(occurrenceDate);
+  beforeDay.setUTCDate(beforeDay.getUTCDate() - 1);
+  afterDay.setUTCDate(afterDay.getUTCDate() + 1);
+  const beforeEnd = isoDate(beforeDay);
+  const afterStart = isoDate(afterDay);
+  const keepBefore = beforeEnd >= event.start_date;
+  const keepAfter = afterStart <= event.end_date;
+
+  if (keepBefore && keepAfter) {
+    const clone = structuredClone(event);
+    clone.id = state.nextId;
+    state.nextId += 1;
+    clone.start_date = afterStart;
+    event.end_date = beforeEnd;
+    state.events.push(clone);
+    return;
+  }
+  if (keepBefore) {
+    event.end_date = beforeEnd;
+    return;
+  }
+  if (keepAfter) {
+    event.start_date = afterStart;
+    return;
+  }
+  state.events = state.events.filter((item) => item.id !== event.id);
+}
+
+function deleteEventWithChoice(id, occurrenceDate = '') {
+  const event = state.events.find((item) => item.id === id);
+  if (!event) return;
+
+  const isRecurring = event.recurrence_type && event.recurrence_type !== 'none';
+  if (!isRecurring) {
+    deleteEvent(id);
+    return;
+  }
+
+  const mode = askDeleteMode();
+  if (!mode) return;
+  if (mode === 'all') {
+    deleteEvent(id);
+    return;
+  }
+
+  const deleteDate = occurrenceDate || event.start_date;
+  if (deleteDate < event.start_date || deleteDate > event.end_date) {
+    flash('Could not delete this recurring occurrence.', 'danger');
+    return;
+  }
+  if (event.recurrence_type === 'weekly' && !isWeeklyOccurrenceMatch(event, deleteDate)) {
+    flash('Could not delete this recurring occurrence.', 'danger');
+    return;
+  }
+
+  deleteSingleOccurrence(event, deleteDate);
+  saveState();
+  renderCalendar();
+  flash('Recurring event occurrence deleted.', 'success');
+}
+
 function moveEventByOccurrence(eventId, targetDate, anchorDate = '') {
   const source = state.events.find((entry) => entry.id === eventId);
   if (!source || !targetDate) return false;
@@ -866,7 +944,7 @@ function bindUI() {
   document.getElementById('deleteEventBtn').addEventListener('click', () => {
     const id = Number(document.getElementById('eventId').value);
     if (id) {
-      deleteEvent(id);
+      deleteEventWithChoice(id, document.getElementById('startDate').value);
       eventModal.hide();
     }
   });
@@ -938,7 +1016,7 @@ function bindUI() {
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();
-    if (activeEventId) deleteEvent(activeEventId);
+    if (activeEventId) deleteEventWithChoice(activeEventId, activeEventOccurrenceDate || '');
   });
 
   ['click', 'scroll', 'resize'].forEach((eventName) => window.addEventListener(eventName, hideMenus, { passive: true }));

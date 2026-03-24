@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
   const deleteForm = document.getElementById('deleteEventForm');
+  const deleteModeInput = document.getElementById('deleteMode');
+  const deleteOccurrenceDateInput = document.getElementById('deleteOccurrenceDate');
   const eventActionForm = document.getElementById('eventActionForm');
   const eventActionTargetDate = document.getElementById('eventActionTargetDate');
   const eventActionAnchorDate = document.getElementById('eventActionAnchorDate');
@@ -88,10 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result.ok) window.location.reload();
   });
 
-  document.getElementById('contextDeleteEvent').addEventListener('click', () => {
+  document.getElementById('contextDeleteEvent').addEventListener('click', async () => {
     hideMenus();
-    deleteForm.action = `/events/delete/${activeEventId}`;
-    deleteForm.submit();
+    await submitDeleteEvent(activeEventId, activeEventOccurrenceDate);
   });
 
   function monthCalendarLabel() {
@@ -667,6 +668,45 @@ document.addEventListener('DOMContentLoaded', () => {
     validationEl.classList.remove('d-none');
   }
 
+  async function submitDeleteEvent(eventId, occurrenceDate = '') {
+    if (!eventId) return;
+    const details = await fetchEventDetails(eventId);
+    if (!details) {
+      showValidation('Unable to load this event right now.');
+      return;
+    }
+
+    const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
+    const deleteMode = isRecurring ? askDeleteMode() : 'all';
+    if (!deleteMode) return;
+
+    deleteModeInput.value = deleteMode;
+    deleteOccurrenceDateInput.value = deleteMode === 'single'
+      ? (occurrenceDate || details.start_date || '')
+      : '';
+    deleteForm.action = `/events/delete/${eventId}`;
+    deleteForm.submit();
+  }
+
+  async function fetchEventDetails(eventId) {
+    try {
+      const response = await fetch(`/api/event/${eventId}`);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function askDeleteMode() {
+    const deleteOne = window.confirm(
+      'This is a recurring event.\n\nPress OK to delete only this occurrence.\nPress Cancel to choose another option.'
+    );
+    if (deleteOne) return 'single';
+    const deleteAll = window.confirm('Delete all occurrences in this recurring event series?');
+    return deleteAll ? 'all' : '';
+  }
+
   function hiddenMetaStorageKey() {
     return `mycal.hiddenMeta.${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}`;
   }
@@ -719,4 +759,11 @@ document.addEventListener('DOMContentLoaded', () => {
     applyDateStyles();
     renderEvents();
   }
+
+  document.getElementById('deleteEventBtn').addEventListener('click', async () => {
+    const eventId = Number(document.getElementById('eventId').value);
+    const occurrenceDate = document.getElementById('startDate').value;
+    await submitDeleteEvent(eventId, occurrenceDate);
+    eventModal.hide();
+  });
 });
