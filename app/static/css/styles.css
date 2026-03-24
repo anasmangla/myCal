@@ -33,6 +33,32 @@ body {
   padding: 0.85rem 1rem;
 }
 
+.action-bar {
+  flex-wrap: nowrap;
+}
+
+.action-bar .btn {
+  --bs-btn-padding-y: 0.2rem;
+  --bs-btn-padding-x: 0.5rem;
+  --bs-btn-font-size: 0.78rem;
+  --bs-btn-border-radius: 0.35rem;
+  white-space: nowrap;
+}
+
+.no-print .btn {
+  --bs-btn-padding-y: 0.28rem;
+  --bs-btn-padding-x: 0.6rem;
+  --bs-btn-font-size: 0.82rem;
+  --bs-btn-border-radius: 0.4rem;
+}
+
+@media (max-width: 992px) {
+  .action-bar {
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+}
+
 .calendar-card {
   overflow: hidden;
 }

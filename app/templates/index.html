@@ -4,7 +4,6 @@
   <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 no-print">
     <div>
       <h1 class="h3 mb-1">myCal Monthly Planner</h1>
-      <p class="text-muted mb-0">A polished monthly planner for holidays, recurring events, printable weeks, and quick exports.</p>
     </div>
     <form class="row g-2 align-items-center" method="get">
       <div class="col-auto">
@@ -34,10 +33,9 @@
       <div class="col-auto"><button class="btn btn-primary">Go</button></div>
     </form>
   </div>
-
   <div class="toolbar-panel no-print mb-3">
-    <div class="d-flex flex-column flex-xl-row gap-3 justify-content-between align-items-xl-center">
-      <div class="d-flex flex-wrap gap-2 action-bar">
+    <div class="d-flex align-items-center justify-content-start">
+      <div class="d-flex gap-2 action-bar">
         <button class="btn btn-outline-primary btn-sm" type="button" data-print-mode="month">
           <i class="bi bi-printer me-1" aria-hidden="true"></i>Print / Save PDF
         </button>
@@ -45,10 +43,8 @@
           <i class="bi bi-image me-1" aria-hidden="true"></i>Export image
         </button>
       </div>
-<div class="text-muted small">Double-click any date in this month to add an event. Printing and image exports use landscape layout.</div>
     </div>
   </div>
-
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
   <div class="mb-3 no-print">
@@ -66,7 +62,6 @@
           <h2 class="h4 mb-1" id="calendarTitleDisplay" tabindex="0" role="button" aria-label="Edit calendar title"></h2>
           <input type="text" class="form-control form-control-sm d-none" id="calendarTitleInput" maxlength="200" aria-label="Calendar title">
         </div>
-        <p class="small text-muted mb-0 no-print">Double-click a date to add an event, or right-click an in-month date for more actions.</p>
       </div>
       <div class="calendar-grid-wrapper">
         <div class="calendar-grid weekdays">
@@ -102,7 +97,6 @@
     </div>
   </div>
 </div>
-
 <div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -150,7 +144,6 @@
     </div>
   </div>
 </div>
-
 <div class="position-fixed context-menu card shadow-sm d-none no-print" id="dateContextMenu">
   <button class="dropdown-item" id="contextAddEvent">Add event</button>
   <button class="dropdown-item" id="contextChangeColor">Change date background color</button>
@@ -158,13 +151,11 @@
   <button class="dropdown-item" id="contextToggleHoliday">Hide U.S. holiday on this day</button>
   <button class="dropdown-item" id="contextToggleIslamic">Hide Islamic date on this day</button>
 </div>
-
 <div class="position-fixed context-menu card shadow-sm d-none no-print" id="eventContextMenu">
   <button class="dropdown-item" id="contextDuplicateEvent">Duplicate event</button>
   <button class="dropdown-item" id="contextMoveEvent">Move event</button>
   <button class="dropdown-item text-danger" id="contextDeleteEvent">Delete event</button>
 </div>
-
 <form method="post" id="deleteEventForm" class="d-none">
   <input type="hidden" name="return_year" value="{{ selected_year }}">
   <input type="hidden" name="return_month" value="{{ selected_month }}">
