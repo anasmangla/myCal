@@ -11,6 +11,11 @@
   --sheet-weekday-height: 0.32in;
 }
 
+@import url('./components/cell-editor.css');
+@import url('./components/attachments.css');
+@import url('./components/sidepanel.css');
+@import url('./components/share-menu.css');
+
 body {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   color: #0f172a;
@@ -18,6 +23,10 @@ body {
 
 .app-shell {
   max-width: 1320px;
+}
+
+.search-input {
+  max-width: 420px;
 }
 
 .toolbar-panel {
@@ -325,6 +334,14 @@ body {
   outline-offset: -3px;
 }
 
+.cell-note-preview {
+  margin-top: 0.2rem;
+  font-size: 0.6rem;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  color: #334155;
+}
+
 .exporting-calendar .no-print {
   visibility: hidden !important;
 }
@@ -378,3 +395,4 @@ body {
     transform: none !important;
   }
 }
+:root {
