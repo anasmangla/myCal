@@ -53,6 +53,8 @@ body {
 }
 
 .calendar-page {
+  --calendar-title-height: 0.7in;
+  --calendar-weekday-height: 0.32in;
   width: 11in;
   height: 8.5in;
   margin: 0 auto;
@@ -71,7 +73,8 @@ body {
 }
 
 .calendar-title {
-  flex: 0 0 auto;
+  flex: 0 0 var(--calendar-title-height);
+  min-height: var(--calendar-title-height);
   padding: 0.45rem 0.75rem;
 }
 
@@ -113,7 +116,8 @@ body {
 }
 
 .calendar-grid.weekdays {
-  flex: 0 0 auto;
+  flex: 0 0 var(--calendar-weekday-height);
+  min-height: var(--calendar-weekday-height);
 }
 
 .weekday-cell {
@@ -133,7 +137,9 @@ body {
 }
 
 .calendar-grid.day-grid {
-  flex: 1;
+  flex: 0 0 calc(100% - var(--calendar-title-height) - var(--calendar-weekday-height));
+  min-height: 0;
+  height: calc(100% - var(--calendar-title-height) - var(--calendar-weekday-height));
   grid-template-rows: repeat(6, 1fr);
 }
 
