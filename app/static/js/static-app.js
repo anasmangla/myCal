@@ -262,6 +262,9 @@ const view = {
   month: defaults.month,
   selectedWeekIndex: 0,
 };
+const printState = {
+  mode: 'month',
+};
 let activeDate = null;
 let activeEventId = null;
 let eventModal;
@@ -401,12 +404,14 @@ function renderCalendar() {
     row.className = `calendar-grid week-row ${weekIndex === view.selectedWeekIndex ? 'selected-week' : ''}`;
     row.dataset.weekIndex = String(weekIndex);
     row.addEventListener('click', () => setSelectedWeek(weekIndex));
+    let inMonthCount = 0;
 
     week.forEach((day) => {
       const key = isoDate(day);
       const cell = document.createElement('div');
       cell.className = 'calendar-cell';
       const inMonth = day.getUTCMonth() === view.month - 1;
+      if (inMonth) inMonthCount += 1;
       if (day.getUTCDay() === 0 || day.getUTCDay() === 6) cell.classList.add('weekend');
       if (!inMonth) cell.classList.add('outside-month');
       if (holidayMap.has(key)) cell.classList.add('holiday');
@@ -474,14 +479,17 @@ function renderCalendar() {
       row.appendChild(cell);
     });
 
+    row.dataset.inMonthCount = String(inMonthCount);
+    row.classList.toggle('outside-month-row', inMonthCount === 0);
     body.appendChild(row);
   });
-
+  updatePrintMetrics();
 }
 
 function setSelectedWeek(index) {
   view.selectedWeekIndex = Number(index);
   document.querySelectorAll('.week-row').forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(view.selectedWeekIndex)));
+  updatePrintMetrics(printState.mode);
 }
 
 function openEventModal(payload) {
@@ -663,6 +671,63 @@ function hideMenus() {
   document.getElementById('eventContextMenu').classList.add('d-none');
 }
 
+function pxPerInch() {
+  const probe = document.createElement('div');
+  probe.style.width = '1in';
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  document.body.appendChild(probe);
+  const pixels = probe.getBoundingClientRect().width || 96;
+  probe.remove();
+  return pixels;
+}
+
+function getVisiblePrintRows(mode = printState.mode) {
+  const rows = Array.from(document.querySelectorAll('#calendarBody .week-row')).filter((row) => Number(row.dataset.inMonthCount || 0) > 0);
+  if (mode === 'week') return rows.filter((row) => row.dataset.weekIndex === String(view.selectedWeekIndex));
+  return rows;
+}
+
+function markPrintTargetWeek() {
+  document.querySelectorAll('#calendarBody .week-row').forEach((row) => {
+    row.classList.toggle('print-target-week', row.dataset.weekIndex === String(view.selectedWeekIndex));
+  });
+}
+
+function updatePrintMetrics(mode = printState.mode) {
+  markPrintTargetWeek();
+  const root = document.documentElement;
+  const visibleRows = getVisiblePrintRows(mode);
+  const rowCount = Math.max(visibleRows.length, 1);
+  const marginInches = 0.35;
+  const printableHeight = (11 - (marginInches * 2)) * pxPerInch();
+  const titleHeight = document.querySelector('.calendar-title')?.getBoundingClientRect().height || 0;
+  const weekdayHeight = document.getElementById('weekdayHeader')?.getBoundingClientRect().height || 0;
+  const cardBody = document.querySelector('.calendar-card .card-body');
+  const cardBodyStyles = cardBody ? window.getComputedStyle(cardBody) : null;
+  const bodyPadding = cardBodyStyles
+    ? (parseFloat(cardBodyStyles.paddingTop) + parseFloat(cardBodyStyles.paddingBottom))
+    : 0;
+  const availableBodyHeight = Math.max(printableHeight - titleHeight - weekdayHeight - bodyPadding - 8, 0);
+  const minRowHeight = 1.05 * pxPerInch();
+  const computedRowHeight = Math.max(minRowHeight, Math.floor(availableBodyHeight / rowCount));
+  root.style.setProperty('--print-visible-weeks', String(rowCount));
+  root.style.setProperty('--print-week-row-height', `${computedRowHeight}px`);
+  root.style.setProperty('--print-calendar-grid-height', `${computedRowHeight * rowCount}px`);
+}
+
+function prepareForPrint(mode) {
+  printState.mode = mode || 'month';
+  document.body.classList.toggle('print-week-mode', printState.mode === 'week');
+  updatePrintMetrics(printState.mode);
+}
+
+function resetPrintLayout() {
+  document.body.classList.remove('print-week-mode');
+  printState.mode = 'month';
+  updatePrintMetrics('month');
+}
+
 function bindUI() {
   document.getElementById('calendarControls').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -680,7 +745,10 @@ function bindUI() {
     saveState();
     renderCalendar();
   });
-  document.querySelectorAll('[data-print-mode]').forEach((button) => button.addEventListener('click', () => window.print()));
+  document.querySelectorAll('[data-print-mode]').forEach((button) => button.addEventListener('click', () => {
+    prepareForPrint(button.dataset.printMode || 'month');
+    window.print();
+  }));
   document.getElementById('exportImageBtn').addEventListener('click', async () => {
     try {
       document.body.classList.add('exporting-calendar');
@@ -765,6 +833,9 @@ function bindUI() {
   });
 
   ['click', 'scroll', 'resize'].forEach((eventName) => window.addEventListener(eventName, hideMenus, { passive: true }));
+  window.addEventListener('resize', () => updatePrintMetrics(printState.mode), { passive: true });
+  window.addEventListener('beforeprint', () => prepareForPrint(printState.mode));
+  window.addEventListener('afterprint', resetPrintLayout);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideMenus();
   });
