@@ -271,6 +271,7 @@ const view = {
 };
 let activeDate = null;
 let activeEventId = null;
+let activeEventOccurrenceDate = null;
 let eventModal;
 
 function initOptions() {
@@ -503,6 +504,7 @@ function renderCalendar() {
         chip.style.backgroundColor = item.color;
         chip.textContent = item.display_text;
         chip.title = [item.title, item.location, item.notes].filter(Boolean).join(' • ');
+        chip.draggable = Boolean(!item.is_holiday && item.source_event_id);
         chip.addEventListener('click', (event) => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
@@ -513,10 +515,51 @@ function renderCalendar() {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
           activeEventId = item.source_event_id;
+          activeEventOccurrenceDate = key;
           showMenu(document.getElementById('eventContextMenu'), event.pageX, event.pageY);
+        });
+        chip.addEventListener('dragstart', (event) => {
+          if (item.is_holiday || !item.source_event_id) return;
+          activeEventId = item.source_event_id;
+          activeEventOccurrenceDate = key;
+          event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.source_event_id, anchorDate: key }));
+          event.dataTransfer.effectAllowed = 'move';
+          chip.classList.add('is-dragging');
+        });
+        chip.addEventListener('dragend', () => {
+          chip.classList.remove('is-dragging');
+          document.querySelectorAll('.calendar-cell.drop-target').forEach((cellEl) => cellEl.classList.remove('drop-target'));
         });
         list.appendChild(chip);
       });
+
+      if (inMonth) {
+        cell.addEventListener('dragenter', (event) => {
+          if (!Array.from(event.dataTransfer?.types || []).includes('text/plain')) return;
+          event.preventDefault();
+          cell.classList.add('drop-target');
+        });
+        cell.addEventListener('dragover', (event) => {
+          if (!Array.from(event.dataTransfer?.types || []).includes('text/plain')) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          cell.classList.add('drop-target');
+        });
+        cell.addEventListener('dragleave', () => {
+          cell.classList.remove('drop-target');
+        });
+        cell.addEventListener('drop', (event) => {
+          event.preventDefault();
+          cell.classList.remove('drop-target');
+          try {
+            const payload = JSON.parse(event.dataTransfer.getData('text/plain') || '{}');
+            const moved = moveEventByOccurrence(payload.eventId, key, payload.anchorDate || '');
+            if (moved) flash('Event moved successfully.');
+          } catch (error) {
+            flash('Unable to move event. Please try again.', 'danger');
+          }
+        });
+      }
 
       monthGrid.appendChild(cell);
     });
@@ -693,6 +736,25 @@ function deleteEvent(id) {
   flash('Event deleted.', 'success');
 }
 
+function moveEventByOccurrence(eventId, targetDate, anchorDate = '') {
+  const source = state.events.find((entry) => entry.id === eventId);
+  if (!source || !targetDate) return false;
+  const toDate = parseIsoDate(targetDate);
+  if (Number.isNaN(toDate.getTime())) return false;
+
+  const anchor = anchorDate || source.start_date;
+  const dayOffset = getSpanDays(anchor, targetDate) - 1;
+  const currentStart = parseIsoDate(source.start_date);
+  const currentEnd = parseIsoDate(source.end_date);
+  currentStart.setUTCDate(currentStart.getUTCDate() + dayOffset);
+  currentEnd.setUTCDate(currentEnd.getUTCDate() + dayOffset);
+  source.start_date = isoDate(currentStart);
+  source.end_date = isoDate(currentEnd);
+  saveState();
+  renderCalendar();
+  return true;
+}
+
 function showMenu(menu, x, y) {
   hideMenus();
   if (menu.id === 'dateContextMenu') syncDateMenuLabels();
@@ -848,10 +910,31 @@ function bindUI() {
       flash('Date color saved.');
     }
   });
-  document.getElementById('contextEditEvent').addEventListener('click', () => {
+  document.getElementById('contextModifyEvent').addEventListener('click', () => {
     hideMenus();
     const source = state.events.find((entry) => entry.id === activeEventId);
     if (source) openEventModal(source);
+  });
+  document.getElementById('contextMoveEvent').addEventListener('click', () => {
+    hideMenus();
+    const source = state.events.find((entry) => entry.id === activeEventId);
+    if (!source) return;
+
+    const defaultDate = activeEventOccurrenceDate || source.start_date || '';
+    const nextStart = window.prompt('Move event to start on (YYYY-MM-DD):', defaultDate);
+    if (!nextStart) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextStart)) {
+      flash('Please enter the new date in YYYY-MM-DD format.', 'danger');
+      return;
+    }
+
+    const movedStart = parseIsoDate(nextStart);
+    if (Number.isNaN(movedStart.getTime())) {
+      flash('Please enter a valid calendar date.', 'danger');
+      return;
+    }
+    const moved = moveEventByOccurrence(source.id, nextStart, activeEventOccurrenceDate || source.start_date || '');
+    if (moved) flash('Event moved successfully.');
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();

@@ -280,6 +280,20 @@ body {
   overflow-wrap: anywhere;
 }
 
+.event-chip[draggable="true"] {
+  cursor: grab;
+}
+
+.event-chip.is-dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+}
+
+.calendar-cell.drop-target {
+  outline: 2px dashed #2563eb;
+  outline-offset: -2px;
+}
+
 .event-chip:hover {
   color: white;
   filter: brightness(1.03);
