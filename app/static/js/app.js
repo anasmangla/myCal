@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPrintButtons();
   setupCalendarScaling();
   setupExportImage();
+  setupDataImport();
   setupContextMenus();
   setupFormBehavior();
   setupEventDragAndDrop();
@@ -442,6 +443,27 @@ document.addEventListener('DOMContentLoaded', () => {
         calendarNode.style.transformOrigin = originalTransformOrigin;
         scaleCalendar();
       }
+    });
+  }
+
+  function setupDataImport() {
+    const importButton = document.getElementById('importJsonBtn');
+    const importForm = document.getElementById('importDataForm');
+    const fileInput = document.getElementById('importDataFileInput');
+    if (!importButton || !importForm || !fileInput) return;
+
+    importButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      const selectedFile = fileInput.files[0];
+      const shouldImport = window.confirm(
+        `Import "${selectedFile.name}"? This replaces current events and date colors.`,
+      );
+      if (!shouldImport) {
+        fileInput.value = '';
+        return;
+      }
+      importForm.submit();
     });
   }
 
