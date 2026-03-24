@@ -12,6 +12,7 @@ from .calendar_utils import (
     MONTH_NAMES,
     RECURRENCE_CHOICES,
     WEEKDAY_CHOICES,
+    day_in_weekly_pattern,
     first_visible_month,
     month_context,
 )
@@ -118,9 +119,30 @@ def save_event():
 @bp.post('/events/delete/<int:event_id>')
 def delete_event(event_id: int):
     event = Event.query.get_or_404(event_id)
-    db.session.delete(event)
+    delete_mode = (request.form.get('delete_mode') or 'all').strip().lower()
+    occurrence_raw = request.form.get('occurrence_date')
+
+    if event.recurrence_type == 'none' or delete_mode != 'single':
+        db.session.delete(event)
+        db.session.commit()
+        flash('Event deleted.', 'success')
+        return redirect(_return_url())
+
+    try:
+        occurrence_day = _parse_day(occurrence_raw)
+    except ValidationError:
+        db.session.delete(event)
+        db.session.commit()
+        flash('Event deleted.', 'success')
+        return redirect(_return_url())
+
+    if not _is_valid_occurrence_date(event, occurrence_day):
+        flash('The selected recurring occurrence could not be deleted.', 'danger')
+        return redirect(_return_url())
+
+    _delete_single_occurrence(event, occurrence_day)
     db.session.commit()
-    flash('Event deleted.', 'success')
+    flash('Recurring event occurrence deleted.', 'success')
     return redirect(_return_url())
 
 
@@ -320,6 +342,41 @@ def _clone_event(source: Event) -> Event:
     return duplicate
 
 
+def _is_valid_occurrence_date(event: Event, occurrence_day):
+    if occurrence_day < event.start_date or occurrence_day > event.end_date:
+        return False
+    if event.recurrence_type == 'daily':
+        return True
+    if event.recurrence_type == 'weekly':
+        return day_in_weekly_pattern(occurrence_day, event.recurrence_weekdays)
+    return False
+
+
+def _delete_single_occurrence(event: Event, occurrence_day):
+    original_end = event.end_date
+    before_end = occurrence_day - timedelta(days=1)
+    after_start = occurrence_day + timedelta(days=1)
+
+    keep_before = before_end >= event.start_date
+    keep_after = after_start <= original_end
+
+    if keep_before and keep_after:
+        follow_up = _clone_event(event)
+        follow_up.start_date = after_start
+        follow_up.end_date = original_end
+        event.end_date = before_end
+        db.session.add(follow_up)
+        return
+
+    if keep_before:
+        event.end_date = before_end
+        return
+
+    if keep_after:
+        event.start_date = after_start
+        return
+
+    db.session.delete(event)
 def _build_event_from_import(item):
     if not isinstance(item, dict):
         raise ValidationError('Each event must be an object.')

@@ -166,6 +166,8 @@
   <input type="hidden" name="return_month" value="{{ selected_month }}">
   <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
   <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="hidden" name="delete_mode" id="deleteMode" value="all">
+  <input type="hidden" name="occurrence_date" id="deleteOccurrenceDate" value="">
 </form>
 <form method="post" id="eventActionForm" class="d-none">
   <input type="hidden" name="return_year" value="{{ selected_year }}">
