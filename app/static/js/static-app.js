@@ -693,7 +693,6 @@ function pxPerInch() {
 
 function getVisiblePrintRows(mode = printState.mode) {
   const rows = Array.from(document.querySelectorAll('#calendarBody .week-row')).filter((row) => Number(row.dataset.inMonthCount || 0) > 0);
-  if (mode === 'week') return rows.filter((row) => row.dataset.weekIndex === String(view.selectedWeekIndex));
   return rows;
 }
 
@@ -726,13 +725,11 @@ function updatePrintMetrics(mode = printState.mode) {
 }
 
 function prepareForPrint(mode) {
-  printState.mode = mode || 'month';
-  document.body.classList.toggle('print-week-mode', printState.mode === 'week');
+  printState.mode = 'month';
   updatePrintMetrics(printState.mode);
 }
 
 function resetPrintLayout() {
-  document.body.classList.remove('print-week-mode');
   printState.mode = 'month';
   updatePrintMetrics('month');
 }

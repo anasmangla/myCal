@@ -243,7 +243,7 @@ body {
 }
 
 @page {
-  size: letter portrait;
+  size: letter landscape;
   margin: var(--print-page-margin);
 }
 
@@ -256,7 +256,7 @@ body {
 
   body {
     background: white;
-    font-size: 10px;
+    font-size: 13px;
     margin: 0 !important;
     padding: 0 !important;
     color: #111827;
@@ -297,7 +297,7 @@ body {
   }
 
   .calendar-title {
-    padding: 0.2rem 0.3rem !important;
+    padding: 0.5rem 0.65rem !important;
     border-bottom: 1px solid #9ca3af !important;
   }
 
@@ -333,14 +333,13 @@ body {
     break-inside: avoid;
   }
 
-  body.print-week-mode .calendar-grid.week-row:not(.print-target-week),
   .calendar-grid.week-row.outside-month-row {
     display: none !important;
   }
 
   .weekday-cell {
-    padding: 0.16rem 0.1rem;
-    font-size: 10px;
+    padding: 0.32rem 0.2rem;
+    font-size: 12px;
     font-weight: 800;
     border-right-width: 1px;
     background: #111827;
@@ -349,7 +348,7 @@ body {
 
   .calendar-cell {
     min-height: 0;
-    padding: 0.2rem;
+    padding: 0.3rem;
     break-inside: avoid;
     border-right-width: 1px;
     border-bottom-width: 1px;
@@ -363,7 +362,7 @@ body {
   }
 
   .day-number {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 800;
   }
 
@@ -375,7 +374,7 @@ body {
 
   .holiday-pill,
   .event-chip {
-    font-size: 8px;
+    font-size: 10px;
     line-height: 1.15;
   }
 
