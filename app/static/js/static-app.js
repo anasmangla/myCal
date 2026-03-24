@@ -87,6 +87,9 @@ function buildMonthGrid(year, month) {
     }
     grid.push(days);
   }
+  while (grid.length > 0 && grid[grid.length - 1].every((day) => day.getUTCMonth() !== monthIndex)) {
+    grid.pop();
+  }
   return grid;
 }
 
