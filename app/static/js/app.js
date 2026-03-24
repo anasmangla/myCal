@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applyDateStyles();
   renderEvents();
-  setupRowHighlighting();
+  setupDaySelection();
   setupCalendarTitle();
   setupPrintButtons();
   setupExportImage();
@@ -291,12 +291,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function setupRowHighlighting() {
-    document.querySelectorAll('.week-row').forEach((row) => {
-      row.addEventListener('click', () => {
-        document.querySelectorAll('.week-row').forEach((item) => item.classList.toggle('selected-week', item === row));
-      });
+  function setupDaySelection() {
+    const inMonthCells = Array.from(document.querySelectorAll('.calendar-cell[data-in-month="true"]'));
+    if (!inMonthCells.length) return;
+
+    const firstOfMonth = inMonthCells.find((cell) => cell.dataset.date?.endsWith('-01')) || inMonthCells[0];
+    selectDayCell(firstOfMonth);
+
+    inMonthCells.forEach((cell) => {
+      cell.addEventListener('click', () => selectDayCell(cell));
     });
+  }
+
+  function selectDayCell(targetCell) {
+    document.querySelectorAll('.calendar-cell.selected-day').forEach((cell) => {
+      cell.classList.remove('selected-day');
+      cell.setAttribute('aria-selected', 'false');
+    });
+    targetCell.classList.add('selected-day');
+    targetCell.setAttribute('aria-selected', 'true');
   }
 
   function setupPrintButtons() {

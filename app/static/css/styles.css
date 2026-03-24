@@ -223,7 +223,7 @@ body {
   overflow: hidden;
 }
 
-.selected-week .calendar-cell[data-in-month="true"] {
+.calendar-cell.selected-day[data-in-month="true"] {
   outline: 3px solid #2563eb;
   outline-offset: -3px;
 }
