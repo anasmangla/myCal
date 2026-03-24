@@ -89,7 +89,10 @@ def month_bounds(year: int, month: int) -> tuple[date, date]:
 def build_month_grid(year: int, month: int) -> list[list[date]]:
     cal = calendar.Calendar(firstweekday=6)
     days = list(cal.itermonthdates(year, month))
-    return [days[index:index + 7] for index in range(0, len(days), 7)]
+    if len(days) < 42:
+        last_visible = days[-1]
+        days.extend(last_visible + timedelta(days=offset) for offset in range(1, 43 - len(days)))
+    return [days[index:index + 7] for index in range(0, 42, 7)]
 
 
 def build_week_metadata(grid: list[list[date]], month: int) -> list[CalendarWeek]:

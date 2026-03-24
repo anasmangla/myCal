@@ -56,28 +56,25 @@
   {% endif %}
   {% endwith %}
 
-  <div class="print-container" id="printContainer">
-    <div class="card shadow-sm calendar-card" id="calendarCapture">
-    <div class="card-body p-0">
-      <div class="calendar-title text-center py-3 border-bottom">
+  <div class="calendar-scale-wrapper" id="calendarScaleWrapper">
+    <div class="calendar-page" id="calendarCapture">
+      <div class="calendar-title text-center border-bottom">
         <div class="calendar-title-editor">
           <h2 class="h4 mb-1" id="calendarTitleDisplay" tabindex="0" role="button" aria-label="Edit calendar title"></h2>
           <input type="text" class="form-control form-control-sm d-none" id="calendarTitleInput" maxlength="200" aria-label="Calendar title">
         </div>
       </div>
-      <div class="calendar-grid-wrapper">
-        <div class="calendar-grid weekdays">
-          {% for weekday in weekday_names %}
-          <div class="weekday-cell">{{ weekday[:3]|upper }}</div>
-          {% endfor %}
-        </div>
-        <div id="calendarBody">
+      <div class="calendar-grid weekdays">
+        {% for weekday in weekday_names %}
+        <div class="weekday-cell">{{ weekday[:3]|upper }}</div>
+        {% endfor %}
+      </div>
+      <div id="calendarBody" class="calendar-grid day-grid">
         {% for week in grid %}
-        <div class="calendar-grid week-row" data-week-index="{{ loop.index0 }}">
           {% for day in week %}
           {% set iso = day.isoformat() %}
           {% set in_month = day.month == selected_month %}
-          <div class="calendar-cell {% if not in_month %}outside-month{% endif %}" data-date="{{ iso }}" data-in-month="{{ "true" if in_month else "false" }}">
+          <div class="calendar-cell day-cell {% if not in_month %}outside-month{% endif %}" data-date="{{ iso }}" data-in-month="{{ "true" if in_month else "false" }}">
             {% if in_month %}
             <div class="calendar-cell-header">
               <button type="button" class="btn btn-sm btn-light date-action-btn no-print" data-date-action="{{ iso }}" aria-label="Date actions">⋮</button>
@@ -86,18 +83,15 @@
               </div>
             </div>
             <div class="holiday-pill small"></div>
-            <div class="event-list" data-events-for="{{ iso }}"></div>
+            <div class="event-list events" data-events-for="{{ iso }}"></div>
             {% else %}
             <div class="outside-month-fill" aria-hidden="true"></div>
             {% endif %}
           </div>
           {% endfor %}
-        </div>
         {% endfor %}
-        </div>
       </div>
     </div>
-  </div>
   </div>
 </div>
 <div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
