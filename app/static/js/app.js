@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupExportImage();
   setupContextMenus();
   setupFormBehavior();
+  setupEventDragAndDrop();
 
   document.querySelectorAll('.date-action-btn').forEach((button) => {
     button.addEventListener('click', () => {
@@ -177,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.style.backgroundColor = item.color;
         chip.href = '#';
         chip.title = [item.title, item.location, item.notes].filter(Boolean).join(' • ');
+        chip.draggable = Boolean(!item.is_holiday && item.source_event_id);
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
@@ -191,9 +193,71 @@ document.addEventListener('DOMContentLoaded', () => {
           activeEventOccurrenceDate = date;
           showMenu(eventMenu, event.pageX, event.pageY);
         });
+        chip.addEventListener('dragstart', (event) => {
+          if (item.is_holiday || !item.source_event_id) return;
+          activeEventId = item.source_event_id;
+          activeEventOccurrenceDate = date;
+          event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.source_event_id, anchorDate: date }));
+          event.dataTransfer.effectAllowed = 'move';
+          chip.classList.add('is-dragging');
+        });
+        chip.addEventListener('dragend', () => {
+          chip.classList.remove('is-dragging');
+          clearDropHighlights();
+        });
         container.appendChild(chip);
       });
     });
+  }
+
+  function setupEventDragAndDrop() {
+    document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
+      cell.addEventListener('dragenter', (event) => {
+        if (!hasValidEventDrag(event)) return;
+        event.preventDefault();
+        cell.classList.add('drop-target');
+      });
+      cell.addEventListener('dragover', (event) => {
+        if (!hasValidEventDrag(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        cell.classList.add('drop-target');
+      });
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('drop-target');
+      });
+      cell.addEventListener('drop', (event) => {
+        event.preventDefault();
+        cell.classList.remove('drop-target');
+        const payload = parseDragPayload(event);
+        if (!payload || !payload.eventId) return;
+        submitMoveEvent(payload.eventId, cell.dataset.date, payload.anchorDate || '');
+      });
+    });
+  }
+
+  function hasValidEventDrag(event) {
+    return Array.from(event.dataTransfer?.types || []).includes('text/plain');
+  }
+
+  function parseDragPayload(event) {
+    try {
+      return JSON.parse(event.dataTransfer.getData('text/plain') || '{}');
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearDropHighlights() {
+    document.querySelectorAll('.calendar-cell.drop-target').forEach((cell) => cell.classList.remove('drop-target'));
+  }
+
+  function submitMoveEvent(eventId, targetDate, anchorDate) {
+    if (!eventId || !targetDate) return;
+    eventActionForm.action = `/events/move/${eventId}`;
+    eventActionTargetDate.value = targetDate;
+    eventActionAnchorDate.value = anchorDate || '';
+    eventActionForm.submit();
   }
 
   document.getElementById('contextModifyEvent').addEventListener('click', async () => {
@@ -219,10 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showValidation('Please enter the new date in YYYY-MM-DD format.');
       return;
     }
-    eventActionForm.action = `/events/move/${activeEventId}`;
-    eventActionTargetDate.value = nextStart;
-    eventActionAnchorDate.value = activeEventOccurrenceDate || '';
-    eventActionForm.submit();
+    submitMoveEvent(activeEventId, nextStart, activeEventOccurrenceDate || '');
   });
 
   const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
