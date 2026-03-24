@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
@@ -121,6 +121,36 @@ def delete_event(event_id: int):
     return redirect(_return_url())
 
 
+@bp.post('/events/duplicate/<int:event_id>')
+def duplicate_event(event_id: int):
+    source = Event.query.get_or_404(event_id)
+    duplicate = _clone_event(source)
+    duplicate.title = f'Copy of {source.title}'
+    db.session.add(duplicate)
+    db.session.commit()
+    flash('Event duplicated.', 'success')
+    return redirect(_return_url())
+
+
+@bp.post('/events/move/<int:event_id>')
+def move_event(event_id: int):
+    event = Event.query.get_or_404(event_id)
+    try:
+        target_date = _parse_day(request.form.get('target_date'))
+        anchor_raw = request.form.get('anchor_date')
+        anchor_date = _parse_day(anchor_raw) if anchor_raw else event.start_date
+    except ValidationError as exc:
+        flash(str(exc), 'danger')
+        return redirect(_return_url())
+
+    delta_days = (target_date - anchor_date).days
+    event.start_date = event.start_date + timedelta(days=delta_days)
+    event.end_date = event.end_date + timedelta(days=delta_days)
+    db.session.commit()
+    flash('Event moved.', 'success')
+    return redirect(_return_url())
+
+
 @bp.post('/date-style')
 def save_date_style():
     try:
@@ -151,6 +181,7 @@ def clear_date_style():
         db.session.commit()
     return jsonify({'status': 'ok', 'message': 'Custom date color cleared.'})
 
+
 def _parse_day(raw_value: str | None):
     if not raw_value:
         raise ValidationError('Choose a valid calendar date.')
@@ -158,6 +189,7 @@ def _parse_day(raw_value: str | None):
         return datetime.strptime(raw_value, '%Y-%m-%d').date()
     except ValueError as exc:
         raise ValidationError('Choose a valid calendar date.') from exc
+
 
 def _validate_color(raw_value: str | None) -> str:
     value = (raw_value or '').strip()
@@ -168,6 +200,26 @@ def _validate_color(raw_value: str | None) -> str:
         raise ValidationError('Choose a valid hex color.')
     return value.lower()
 
+
+def _clone_event(source: Event) -> Event:
+    duplicate = Event(
+        title=source.title,
+        start_date=source.start_date,
+        end_date=source.end_date,
+        start_time=source.start_time,
+        end_time=source.end_time,
+        all_day=source.all_day,
+        location=source.location,
+        audience=source.audience,
+        notes=source.notes,
+        recurrence_type=source.recurrence_type,
+        recurrence_weekdays=source.recurrence_weekdays,
+    )
+    duplicate.day_labels = [
+        EventDayLabel(day_offset=label.day_offset, label=label.label)
+        for label in source.day_labels
+    ]
+    return duplicate
 
 
 def _return_url():

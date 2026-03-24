@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
   const deleteForm = document.getElementById('deleteEventForm');
+  const eventActionForm = document.getElementById('eventActionForm');
+  const eventActionTargetDate = document.getElementById('eventActionTargetDate');
+  const eventActionAnchorDate = document.getElementById('eventActionAnchorDate');
   const titleDisplay = document.getElementById('calendarTitleDisplay');
   const titleInput = document.getElementById('calendarTitleInput');
   let activeDate = null;
@@ -193,40 +196,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  document.getElementById('contextDuplicateEvent').addEventListener('click', async () => {
+  document.getElementById('contextDuplicateEvent').addEventListener('click', () => {
     hideMenus();
     if (!activeEventId) return;
-
-    const eventPayload = await fetchEventPayload(activeEventId);
-    if (!eventPayload) return;
-
-    const duplicatePayload = { ...eventPayload, id: null, title: `Copy of ${eventPayload.title}` };
-    openEventModal(duplicatePayload);
+    eventActionForm.action = `/events/duplicate/${activeEventId}`;
+    eventActionTargetDate.value = '';
+    eventActionAnchorDate.value = activeEventOccurrenceDate || '';
+    eventActionForm.submit();
   });
 
-  document.getElementById('contextMoveEvent').addEventListener('click', async () => {
+  document.getElementById('contextMoveEvent').addEventListener('click', () => {
     hideMenus();
     if (!activeEventId) return;
 
-    const eventPayload = await fetchEventPayload(activeEventId);
-    if (!eventPayload) return;
-
-    const originalStart = eventPayload.start_date;
-    const defaultDate = activeEventOccurrenceDate || originalStart;
+    const defaultDate = activeEventOccurrenceDate || '';
     const nextStart = window.prompt('Move event to start on (YYYY-MM-DD):', defaultDate);
     if (!nextStart) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(nextStart)) {
       showValidation('Please enter the new date in YYYY-MM-DD format.');
       return;
     }
-
-    const deltaDays = getSpanDays(originalStart, nextStart) - 1;
-    const movedPayload = {
-      ...eventPayload,
-      start_date: nextStart,
-      end_date: shiftIsoDate(eventPayload.end_date, deltaDays),
-    };
-    openEventModal(movedPayload);
+    eventActionForm.action = `/events/move/${activeEventId}`;
+    eventActionTargetDate.value = nextStart;
+    eventActionAnchorDate.value = activeEventOccurrenceDate || '';
+    eventActionForm.submit();
   });
 
   const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
@@ -603,26 +596,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showValidation('Unable to save that date style right now.');
       return { ok: false };
     }
-  }
-
-  async function fetchEventPayload(eventId) {
-    try {
-      const response = await fetch(`/api/event/${eventId}`);
-      if (!response.ok) {
-        showValidation('Unable to load that event right now.');
-        return null;
-      }
-      return await response.json();
-    } catch (error) {
-      showValidation('Unable to load that event right now.');
-      return null;
-    }
-  }
-
-  function shiftIsoDate(iso, deltaDays) {
-    const next = new Date(`${iso}T00:00:00Z`);
-    next.setUTCDate(next.getUTCDate() + deltaDays);
-    return next.toISOString().slice(0, 10);
   }
 
   function showValidation(message) {
