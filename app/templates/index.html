@@ -43,6 +43,12 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="exportImageBtn">
           <i class="bi bi-image me-1" aria-hidden="true"></i>Export image
         </button>
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_data') }}">
+          <i class="bi bi-download me-1" aria-hidden="true"></i>Export JSON
+        </a>
+        <button class="btn btn-outline-success btn-sm" type="button" id="importJsonBtn">
+          <i class="bi bi-upload me-1" aria-hidden="true"></i>Import JSON
+        </button>
       </div>
     </div>
   </div>
@@ -167,6 +173,13 @@
   <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
   <input type="hidden" name="target_date" id="eventActionTargetDate">
   <input type="hidden" name="anchor_date" id="eventActionAnchorDate">
+</form>
+<form method="post" action="{{ url_for('calendar.import_data') }}" id="importDataForm" class="d-none" enctype="multipart/form-data">
+  <input type="hidden" name="return_year" value="{{ selected_year }}">
+  <input type="hidden" name="return_month" value="{{ selected_month }}">
+  <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="file" name="calendar_file" id="importDataFileInput" accept=".json,application/json">
 </form>
 <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
 {% endblock %}
