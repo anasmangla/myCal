@@ -268,10 +268,6 @@ const defaults = firstVisibleMonth();
 const view = {
   year: defaults.year,
   month: defaults.month,
-  selectedWeekIndex: 0,
-};
-const printState = {
-  mode: 'month',
 };
 let activeDate = null;
 let activeEventId = null;
@@ -388,6 +384,40 @@ function setupCalendarTitleEditor() {
   });
 }
 
+function setMonthGridSizing(visibleWeekCount) {
+  const calendarSheet = document.getElementById('calendarSheet');
+  const monthGrid = document.getElementById('calendarBody');
+  if (!calendarSheet || !monthGrid || !visibleWeekCount) return;
+
+  const sheetStyles = window.getComputedStyle(calendarSheet);
+  const safeTop = parseFloat(sheetStyles.paddingTop) || 0;
+  const safeBottom = parseFloat(sheetStyles.paddingBottom) || 0;
+  const sheetHeight = calendarSheet.offsetHeight;
+  const usableHeight = sheetHeight - safeTop - safeBottom;
+
+  const rootStyles = window.getComputedStyle(document.documentElement);
+  const headerHeight = parseFloat(rootStyles.getPropertyValue('--sheet-header-height')) * pxPerInch();
+  const weekdayHeight = parseFloat(rootStyles.getPropertyValue('--sheet-weekday-height')) * pxPerInch();
+  const gridHeight = Math.max(0, usableHeight - headerHeight - weekdayHeight);
+
+  monthGrid.style.height = `${gridHeight}px`;
+  monthGrid.style.gridTemplateRows = `repeat(${visibleWeekCount}, minmax(0, 1fr))`;
+}
+
+function updatePreviewScale() {
+  const wrapper = document.getElementById('sheetPreviewWrapper');
+  const sheet = document.getElementById('calendarSheet');
+  if (!wrapper || !sheet) return;
+
+  const naturalSheetWidth = sheet.offsetWidth;
+  if (!naturalSheetWidth) return;
+
+  const availableWidth = wrapper.clientWidth;
+  const scale = Math.min(1, availableWidth / naturalSheetWidth);
+  sheet.style.setProperty('--preview-scale', String(scale));
+  wrapper.style.height = `${sheet.offsetHeight * scale}px`;
+}
+
 function renderCalendar() {
   document.getElementById('monthSelect').value = String(view.month);
   document.getElementById('yearSelect').value = String(view.year);
@@ -404,30 +434,17 @@ function renderCalendar() {
     occurrences[key].unshift({ source_event_id: null, display_text: name, title: name, location: null, notes: 'U.S. federal holiday', is_holiday: true, all_day: true, color: '#7c3aed' });
   });
 
-  const body = document.getElementById('calendarBody');
-  body.innerHTML = '';
+  const monthGrid = document.getElementById('calendarBody');
+  monthGrid.innerHTML = '';
+  monthGrid.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+  monthGrid.style.gridTemplateRows = `repeat(${grid.length}, minmax(0, 1fr))`;
 
-  let logoPlaced = false;
-  let seenInMonth = false;
-
-  grid.forEach((week, weekIndex) => {
-    const row = document.createElement('div');
-    row.className = `calendar-grid week-row ${weekIndex === view.selectedWeekIndex ? 'selected-week' : ''}`;
-    row.dataset.weekIndex = String(weekIndex);
-    row.addEventListener('click', () => setSelectedWeek(weekIndex));
-    let inMonthCount = 0;
-
-    week.forEach((day, dayIndex) => {
+  grid.forEach((week) => {
+    week.forEach((day) => {
       const key = isoDate(day);
       const cell = document.createElement('div');
-      cell.className = 'calendar-cell';
+      cell.className = 'calendar-cell day-cell';
       const inMonth = day.getUTCMonth() === view.month - 1;
-      if (inMonth) {
-        inMonthCount += 1;
-        seenInMonth = true;
-      }
-      const isLastGridCell = weekIndex === grid.length - 1 && dayIndex === week.length - 1;
-      const placeLogo = !inMonth && !logoPlaced && (!seenInMonth || isLastGridCell);
       if (day.getUTCDay() === 0 || day.getUTCDay() === 6) cell.classList.add('weekend');
       if (!inMonth) cell.classList.add('outside-month');
       const showHoliday = holidayMap.has(key) && !hiddenHolidays.has(key);
@@ -437,6 +454,7 @@ function renderCalendar() {
       if (state.styles[key]) cell.style.background = state.styles[key];
       cell.dataset.date = key;
       cell.dataset.inMonth = inMonth ? 'true' : 'false';
+
       if (inMonth) {
         cell.addEventListener('dblclick', () => openEventModal({ start_date: key, end_date: key }));
         cell.addEventListener('contextmenu', (event) => {
@@ -453,6 +471,7 @@ function renderCalendar() {
           metaLines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
         });
       }
+
       if (inMonth) {
         cell.innerHTML = `
           <div class="calendar-cell-header">
@@ -461,13 +480,6 @@ function renderCalendar() {
           </div>
           <div class="holiday-pill small ${longWeekends.has(key) ? 'holiday-pill-long' : ''} ${metaLines.length ? 'has-content' : ''}">${metaLines.join('')}</div>
           <div class="event-list"></div>
-        `;
-      } else if (placeLogo) {
-        logoPlaced = true;
-        cell.innerHTML = `
-          <div class="outside-month-fill outside-month-logo-wrap">
-            <img src="app/static/img/ahmadiyya-logo.svg" class="outside-month-logo" alt="Ahmadiyya logo" loading="lazy">
-          </div>
         `;
       } else {
         cell.innerHTML = '<div class="outside-month-fill" aria-hidden="true"></div>';
@@ -506,20 +518,12 @@ function renderCalendar() {
         list.appendChild(chip);
       });
 
-      row.appendChild(cell);
+      monthGrid.appendChild(cell);
     });
-
-    row.dataset.inMonthCount = String(inMonthCount);
-    row.classList.toggle('outside-month-row', inMonthCount === 0);
-    body.appendChild(row);
   });
-  if (window.matchMedia('print').matches) prepareForPrint(printState.mode);
-}
 
-function setSelectedWeek(index) {
-  view.selectedWeekIndex = Number(index);
-  document.querySelectorAll('.week-row').forEach((row) => row.classList.toggle('selected-week', row.dataset.weekIndex === String(view.selectedWeekIndex)));
-  if (window.matchMedia('print').matches) prepareForPrint(printState.mode);
+  setMonthGridSizing(grid.length);
+  updatePreviewScale();
 }
 
 function openEventModal(payload) {
@@ -713,54 +717,6 @@ function pxPerInch() {
   return pixels;
 }
 
-function applyPrintScale() {
-  const container = document.getElementById('printContainer');
-  const calendar = document.getElementById('calendarCapture');
-  if (!container || !calendar) return 1;
-
-  const marginInches = 0.5;
-  const pageWidth = (8.5 - (marginInches * 2)) * pxPerInch();
-  const pageHeight = (11 - (marginInches * 2)) * pxPerInch();
-
-  const currentTransform = calendar.style.transform;
-  calendar.style.transform = 'none';
-  calendar.style.transformOrigin = 'top left';
-
-  const calendarRect = calendar.getBoundingClientRect();
-  const scale = Math.min(pageWidth / calendarRect.width, pageHeight / calendarRect.height);
-  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-
-  document.documentElement.style.setProperty('--print-scale', String(safeScale));
-  calendar.style.transform = `scale(${safeScale})`;
-  calendar.style.transformOrigin = 'top left';
-  container.style.height = `${calendarRect.height * safeScale}px`;
-
-  printState.scale = safeScale;
-  printState.mode = 'month';
-  if (currentTransform && currentTransform !== 'none') {
-    printState.previousTransform = currentTransform;
-  }
-  return safeScale;
-}
-
-function prepareForPrint(mode) {
-  printState.mode = mode || 'month';
-  applyPrintScale();
-}
-
-function resetPrintLayout() {
-  const container = document.getElementById('printContainer');
-  const calendar = document.getElementById('calendarCapture');
-  if (calendar) {
-    calendar.style.transform = '';
-    calendar.style.transformOrigin = '';
-  }
-  if (container) container.style.height = '';
-  document.documentElement.style.removeProperty('--print-scale');
-  printState.scale = 1;
-  printState.mode = 'month';
-}
-
 function bindUI() {
   document.getElementById('calendarControls').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -779,16 +735,36 @@ function bindUI() {
     renderCalendar();
   });
   document.querySelectorAll('[data-print-mode]').forEach((button) => button.addEventListener('click', () => {
-    prepareForPrint(button.dataset.printMode || 'month');
     window.print();
   }));
   document.getElementById('exportImageBtn').addEventListener('click', async () => {
+    let clone;
     try {
       document.body.classList.add('exporting-calendar');
       const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
-      prepareForPrint(printState.mode);
-      const calendarNode = document.getElementById('printContainer');
-      const canvas = await html2canvas(calendarNode, { backgroundColor: '#ffffff', scale: Math.max(window.devicePixelRatio || 1, 2), useCORS: true, logging: false, width: calendarNode.scrollWidth, height: calendarNode.scrollHeight, windowWidth: Math.max(document.documentElement.clientWidth, 1600) });
+      const calendarNode = document.getElementById('calendarSheet');
+      clone = calendarNode.cloneNode(true);
+      clone.style.setProperty('--preview-scale', '1');
+      clone.style.transform = 'none';
+      clone.style.position = 'fixed';
+      clone.style.left = '-10000px';
+      clone.style.top = '0';
+      clone.style.margin = '0';
+      clone.style.boxShadow = 'none';
+      document.body.appendChild(clone);
+
+      const targetWidth = 3300;
+      const scale = targetWidth / clone.offsetWidth;
+      const canvas = await html2canvas(clone, {
+        backgroundColor: '#ffffff',
+        scale,
+        useCORS: true,
+        logging: false,
+        width: clone.offsetWidth,
+        height: clone.offsetHeight,
+        windowWidth: clone.offsetWidth,
+        windowHeight: clone.offsetHeight,
+      });
       const link = document.createElement('a');
       link.download = `calendar-${view.year}-${String(view.month).padStart(2, '0')}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -797,7 +773,7 @@ function bindUI() {
       flash('Export failed. Please try again after the calendar fully loads.', 'danger');
     } finally {
       document.body.classList.remove('exporting-calendar');
-      resetPrintLayout();
+      if (clone) clone.remove();
     }
   });
   document.getElementById('clearStorageBtn').addEventListener('click', () => {
@@ -883,9 +859,10 @@ function bindUI() {
   });
 
   ['click', 'scroll', 'resize'].forEach((eventName) => window.addEventListener(eventName, hideMenus, { passive: true }));
-  window.addEventListener('resize', () => { if (window.matchMedia('print').matches) prepareForPrint(printState.mode); }, { passive: true });
-  window.addEventListener('beforeprint', () => prepareForPrint(printState.mode));
-  window.addEventListener('afterprint', resetPrintLayout);
+  window.addEventListener('resize', () => {
+    setMonthGridSizing(buildMonthGrid(view.year, view.month).length);
+    updatePreviewScale();
+  }, { passive: true });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideMenus();
   });

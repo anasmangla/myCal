@@ -32,6 +32,7 @@
           <div class="col-auto"><button class="btn btn-primary" type="submit">Go</button></div>
         </form>
       </div>
+
       <div class="toolbar-panel no-print mb-3">
         <div class="d-flex align-items-center justify-content-start">
           <div class="d-flex gap-2 action-bar">
@@ -47,25 +48,24 @@
           </div>
         </div>
       </div>
+
       <div class="mb-3 no-print d-none" id="flashMessage"></div>
 
-      <div class="print-container" id="printContainer">
-      <div class="card shadow-sm calendar-card" id="calendarCapture">
-        <div class="card-body p-0">
-          <div class="calendar-title text-center py-3 border-bottom">
+      <div class="sheet-preview-wrapper" id="sheetPreviewWrapper">
+        <div class="calendar-sheet" id="calendarSheet">
+          <div class="sheet-header">
+            <img src="AMC_logo.png" class="sheet-logo" alt="AMC logo" loading="lazy">
             <div class="calendar-title-editor">
               <h2 class="h4 mb-1" id="calendarTitle" tabindex="0" role="button" aria-label="Edit calendar title"></h2>
               <input type="text" class="form-control form-control-sm d-none" id="calendarTitleInput" maxlength="200" aria-label="Calendar title">
             </div>
           </div>
-          <div class="calendar-grid-wrapper">
-            <div class="calendar-grid weekdays" id="weekdayHeader"></div>
-            <div id="calendarBody"></div>
-          </div>
+          <div class="weekday-row calendar-grid" id="weekdayHeader"></div>
+          <div class="month-grid" id="calendarBody"></div>
         </div>
       </div>
     </div>
-    </div>
+
     <div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -112,6 +112,7 @@
         </div>
       </div>
     </div>
+
     <div class="position-fixed context-menu card shadow-sm d-none no-print" id="dateContextMenu">
       <button class="dropdown-item" id="contextAddEvent">Add event</button>
       <button class="dropdown-item" id="contextChangeColor">Change date background color</button>
