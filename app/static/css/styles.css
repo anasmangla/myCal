@@ -252,6 +252,7 @@ body {
   body {
     width: 100%;
     height: 100%;
+    overflow: hidden !important;
   }
 
   body {
@@ -266,10 +267,12 @@ body {
     max-width: calc(8.5in - (var(--print-page-margin) * 2));
     width: 100%;
     min-height: calc(var(--print-page-height) - (var(--print-page-margin) * 2));
+    height: calc(var(--print-page-height) - (var(--print-page-margin) * 2));
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     padding: 0 !important;
+    overflow: hidden !important;
   }
 
   .container-fluid.py-4.app-shell {
@@ -294,6 +297,7 @@ body {
     height: calc(var(--print-page-height) - (var(--print-page-margin) * 2));
     display: flex;
     flex-direction: column;
+    overflow: hidden !important;
   }
 
   .calendar-title {
@@ -314,6 +318,7 @@ body {
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
+    overflow: hidden !important;
   }
 
   .calendar-grid.weekdays {
@@ -323,8 +328,9 @@ body {
   #calendarBody {
     display: grid;
     grid-template-rows: repeat(var(--print-visible-weeks), minmax(var(--print-week-row-height), 1fr));
-    height: var(--print-calendar-grid-height);
+    height: 100%;
     min-height: 0;
+    overflow: hidden !important;
   }
 
   .calendar-grid.week-row {
@@ -382,6 +388,11 @@ body {
     gap: 0.12rem;
     overflow: visible;
     padding-top: 0.03rem;
+    scrollbar-width: none;
+  }
+
+  .event-list::-webkit-scrollbar {
+    display: none;
   }
 
   .event-chip {
