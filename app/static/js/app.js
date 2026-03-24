@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const titleInput = document.getElementById('calendarTitleInput');
   let activeDate = null;
   let activeEventId = null;
+  let activeEventOccurrenceDate = null;
 
   applyDateStyles();
   renderEvents();
@@ -161,12 +162,49 @@ document.addEventListener('DOMContentLoaded', () => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
           activeEventId = item.source_event_id;
+          activeEventOccurrenceDate = date;
           showMenu(eventMenu, event.pageX, event.pageY);
         });
         container.appendChild(chip);
       });
     });
   }
+
+  document.getElementById('contextDuplicateEvent').addEventListener('click', async () => {
+    hideMenus();
+    if (!activeEventId) return;
+
+    const eventPayload = await fetchEventPayload(activeEventId);
+    if (!eventPayload) return;
+
+    const duplicatePayload = { ...eventPayload, id: null, title: `Copy of ${eventPayload.title}` };
+    openEventModal(duplicatePayload);
+  });
+
+  document.getElementById('contextMoveEvent').addEventListener('click', async () => {
+    hideMenus();
+    if (!activeEventId) return;
+
+    const eventPayload = await fetchEventPayload(activeEventId);
+    if (!eventPayload) return;
+
+    const originalStart = eventPayload.start_date;
+    const defaultDate = activeEventOccurrenceDate || originalStart;
+    const nextStart = window.prompt('Move event to start on (YYYY-MM-DD):', defaultDate);
+    if (!nextStart) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextStart)) {
+      showValidation('Please enter the new date in YYYY-MM-DD format.');
+      return;
+    }
+
+    const deltaDays = getSpanDays(originalStart, nextStart) - 1;
+    const movedPayload = {
+      ...eventPayload,
+      start_date: nextStart,
+      end_date: shiftIsoDate(eventPayload.end_date, deltaDays),
+    };
+    openEventModal(movedPayload);
+  });
 
   const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
   const islamicNumericFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
@@ -489,6 +527,26 @@ document.addEventListener('DOMContentLoaded', () => {
       showValidation('Unable to save that date style right now.');
       return { ok: false };
     }
+  }
+
+  async function fetchEventPayload(eventId) {
+    try {
+      const response = await fetch(`/api/event/${eventId}`);
+      if (!response.ok) {
+        showValidation('Unable to load that event right now.');
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      showValidation('Unable to load that event right now.');
+      return null;
+    }
+  }
+
+  function shiftIsoDate(iso, deltaDays) {
+    const next = new Date(`${iso}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + deltaDays);
+    return next.toISOString().slice(0, 10);
   }
 
   function showValidation(message) {
