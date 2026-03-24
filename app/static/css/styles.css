@@ -4,6 +4,11 @@
   --long-weekend-bg: #e8edf3;
   --surface: #ffffff;
   --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --print-page-height: 11in;
+  --print-page-margin: 0.35in;
+  --print-week-row-height: 1.15in;
+  --print-visible-weeks: 6;
+  --print-calendar-grid-height: calc(var(--print-week-row-height) * var(--print-visible-weeks));
 }
 
 body {
@@ -85,6 +90,8 @@ body {
 }
 
 .calendar-cell {
+  display: flex;
+  flex-direction: column;
   min-height: 128px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
@@ -143,6 +150,9 @@ body {
 .event-list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   gap: 0.18rem;
 }
 
@@ -233,8 +243,8 @@ body {
 }
 
 @page {
-  size: landscape;
-  margin: 0.12in;
+  size: letter portrait;
+  margin: var(--print-page-margin);
 }
 
 @media print {
@@ -249,12 +259,14 @@ body {
     font-size: 10px;
     margin: 0 !important;
     padding: 0 !important;
+    color: #111827;
   }
 
   .app-shell {
-    max-width: none;
+    max-width: calc(8.5in - (var(--print-page-margin) * 2));
     width: 100%;
-    min-height: 100%;
+    min-height: calc(var(--print-page-height) - (var(--print-page-margin) * 2));
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     padding: 0 !important;
@@ -271,19 +283,22 @@ body {
   .toolbar-panel,
   .calendar-card {
     box-shadow: none;
-    border: 0;
+    border: 1px solid #d1d5db;
     background: white;
+    backdrop-filter: none;
+    border-radius: 0;
   }
 
   .calendar-card {
     width: 100%;
-    height: 100%;
+    height: calc(var(--print-page-height) - (var(--print-page-margin) * 2));
     display: flex;
     flex-direction: column;
   }
 
   .calendar-title {
-    padding: 0.2rem 0.35rem !important;
+    padding: 0.2rem 0.3rem !important;
+    border-bottom: 1px solid #9ca3af !important;
   }
 
   .calendar-card .card-body {
@@ -298,52 +313,98 @@ body {
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
+    height: 100%;
   }
 
   .calendar-grid.weekdays {
     flex: 0 0 auto;
   }
 
+  #calendarBody {
+    display: grid;
+    grid-template-rows: repeat(var(--print-visible-weeks), minmax(var(--print-week-row-height), 1fr));
+    height: var(--print-calendar-grid-height);
+    min-height: 0;
+  }
+
   .calendar-grid.week-row {
-    flex: 1 1 0;
+    min-height: var(--print-week-row-height);
+    height: var(--print-week-row-height);
+    break-inside: avoid;
+  }
+
+  body.print-week-mode .calendar-grid.week-row:not(.print-target-week),
+  .calendar-grid.week-row.outside-month-row {
+    display: none !important;
   }
 
   .weekday-cell {
-    padding: 0.2rem 0.1rem;
-    font-size: 10.5px;
+    padding: 0.16rem 0.1rem;
+    font-size: 10px;
     font-weight: 800;
-    border-right-width: 2px;
+    border-right-width: 1px;
+    background: #111827;
+    color: #ffffff;
   }
 
   .calendar-cell {
     min-height: 0;
-    padding: 0.18rem;
+    padding: 0.2rem;
     break-inside: avoid;
-    border-right-width: 2px;
-    border-bottom-width: 2px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-color: #9ca3af;
+    transition: none;
   }
 
   .calendar-cell-header {
-    margin-bottom: 0.1rem;
+    margin-bottom: 0.14rem;
+    align-items: flex-start;
   }
 
   .day-number {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 800;
+  }
+
+  .holiday-pill {
+    color: #374151;
+    min-height: 0;
+    margin-bottom: 0.12rem;
   }
 
   .holiday-pill,
   .event-chip {
-    font-size: 7px;
-    line-height: 1.05;
+    font-size: 8px;
+    line-height: 1.15;
   }
 
   .event-list {
-    gap: 0.1rem;
+    gap: 0.12rem;
+    overflow: visible;
+    padding-top: 0.03rem;
   }
 
   .event-chip {
-    padding: 0.1rem 0.18rem;
+    padding: 0;
     box-shadow: none;
+    border-radius: 0;
+    border: 0;
+    background: none !important;
+    color: #111827 !important;
+    text-decoration: none;
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .event-chip::before {
+    content: '• ';
+    font-weight: 700;
+    color: #374151;
+  }
+
+  .event-chip.holiday-chip {
+    font-weight: 600;
   }
 }
