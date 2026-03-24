@@ -160,5 +160,13 @@
   <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
   <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
 </form>
+<form method="post" id="eventActionForm" class="d-none">
+  <input type="hidden" name="return_year" value="{{ selected_year }}">
+  <input type="hidden" name="return_month" value="{{ selected_month }}">
+  <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="hidden" name="target_date" id="eventActionTargetDate">
+  <input type="hidden" name="anchor_date" id="eventActionAnchorDate">
+</form>
 <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
 {% endblock %}
