@@ -335,8 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     page.style.transform = 'none';
 
     const scaleX = wrapper.clientWidth / page.offsetWidth;
-    const scaleY = window.innerHeight / page.offsetHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
+    const scale = Math.min(scaleX, 1);
 
     page.style.transform = `scale(${scale})`;
     page.style.transformOrigin = 'top center';
