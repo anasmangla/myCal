@@ -89,8 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteForm.submit();
   });
 
+  function monthCalendarLabel() {
+    const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(data.selectedYear, data.selectedMonth - 1, 1)));
+    return `${monthName} Calendar`;
+  }
+
   function defaultCalendarTitle() {
-    return `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(data.selectedYear, data.selectedMonth - 1, 1)))} ${data.selectedYear} - Ahmadiyya Muslim Jamaat Buffalo`;
+    return monthCalendarLabel();
   }
 
   function calendarTitleStorageKey() {
@@ -101,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextValue = value.trim() || defaultCalendarTitle();
     titleDisplay.textContent = nextValue;
     titleInput.value = nextValue;
+    document.title = nextValue;
     return nextValue;
   }
 
@@ -335,7 +341,11 @@ document.addEventListener('DOMContentLoaded', () => {
           windowWidth: Math.max(document.documentElement.clientWidth, 1600),
         });
         const link = document.createElement('a');
-        link.download = `calendar-${data.selectedYear}-${String(data.selectedMonth).padStart(2, '0')}.png`;
+        const baseName = (titleDisplay.textContent || monthCalendarLabel())
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '') || 'calendar';
+        link.download = `${baseName}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
       } catch (error) {
