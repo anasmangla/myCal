@@ -271,6 +271,7 @@ const view = {
 };
 let activeDate = null;
 let activeEventId = null;
+let activeEventOccurrenceDate = null;
 let eventModal;
 
 function initOptions() {
@@ -513,6 +514,7 @@ function renderCalendar() {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
           activeEventId = item.source_event_id;
+          activeEventOccurrenceDate = key;
           showMenu(document.getElementById('eventContextMenu'), event.pageX, event.pageY);
         });
         list.appendChild(chip);
@@ -848,10 +850,38 @@ function bindUI() {
       flash('Date color saved.');
     }
   });
-  document.getElementById('contextEditEvent').addEventListener('click', () => {
+  document.getElementById('contextModifyEvent').addEventListener('click', () => {
     hideMenus();
     const source = state.events.find((entry) => entry.id === activeEventId);
     if (source) openEventModal(source);
+  });
+  document.getElementById('contextMoveEvent').addEventListener('click', () => {
+    hideMenus();
+    const source = state.events.find((entry) => entry.id === activeEventId);
+    if (!source) return;
+
+    const defaultDate = activeEventOccurrenceDate || source.start_date || '';
+    const nextStart = window.prompt('Move event to start on (YYYY-MM-DD):', defaultDate);
+    if (!nextStart) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextStart)) {
+      flash('Please enter the new date in YYYY-MM-DD format.', 'danger');
+      return;
+    }
+
+    const durationDays = Math.max(1, getSpanDays(source.start_date, source.end_date));
+    const movedStart = parseIsoDate(nextStart);
+    if (Number.isNaN(movedStart.getTime())) {
+      flash('Please enter a valid calendar date.', 'danger');
+      return;
+    }
+    const movedEnd = new Date(movedStart);
+    movedEnd.setUTCDate(movedEnd.getUTCDate() + durationDays - 1);
+
+    source.start_date = isoDate(movedStart);
+    source.end_date = isoDate(movedEnd);
+    saveState();
+    renderCalendar();
+    flash('Event moved successfully.');
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();

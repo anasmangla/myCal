@@ -196,13 +196,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  document.getElementById('contextDuplicateEvent').addEventListener('click', () => {
+  document.getElementById('contextModifyEvent').addEventListener('click', async () => {
     hideMenus();
     if (!activeEventId) return;
-    eventActionForm.action = `/events/duplicate/${activeEventId}`;
-    eventActionTargetDate.value = '';
-    eventActionAnchorDate.value = activeEventOccurrenceDate || '';
-    eventActionForm.submit();
+    const response = await fetch(`/api/event/${activeEventId}`);
+    if (!response.ok) {
+      showValidation('Unable to load this event right now. Please try again.');
+      return;
+    }
+    const payload = await response.json();
+    openEventModal(payload);
   });
 
   document.getElementById('contextMoveEvent').addEventListener('click', () => {
