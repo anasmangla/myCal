@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
@@ -25,17 +25,50 @@ bp = Blueprint('calendar', __name__)
 @bp.get('/')
 def index():
     default_year, default_month = first_visible_month()
-    year = request.args.get('year', default=default_year, type=int)
-    month = request.args.get('month', default=default_month, type=int)
+    month_year = (request.args.get('month_year') or '').strip()
+    if month_year:
+        try:
+            parsed_year, parsed_month = month_year.split('-', 1)
+            year = int(parsed_year)
+            month = int(parsed_month)
+        except (TypeError, ValueError):
+            year, month = default_year, default_month
+    else:
+        year = request.args.get('year', default=default_year, type=int)
+        month = request.args.get('month', default=default_month, type=int)
+
+    today = date.today().replace(day=1)
+    min_month = _add_months(today, -6)
+    max_month = _add_months(today, 12)
+    try:
+        selected_month_date = date(year, month, 1)
+    except ValueError:
+        year, month = default_year, default_month
+        selected_month_date = date(year, month, 1)
+    if selected_month_date < min_month or selected_month_date > max_month:
+        year, month = default_year, default_month
+        selected_month_date = date(year, month, 1)
+
     include_holidays = request.args.get('holidays', '1') == '1'
     include_islamic = request.args.get('islamic', '1') == '1'
     context = month_context(year, month, include_holidays)
-    years = list(range(default_year - 3, default_year + 8))
+    month_year_options = []
+    cursor = min_month
+    while cursor <= max_month:
+        month_year_options.append(
+            {
+                'value': f'{cursor.year}-{cursor.month:02d}',
+                'label': cursor.strftime('%B %Y'),
+            }
+        )
+        cursor = _add_months(cursor, 1)
+
     return render_template(
         'index.html',
         selected_year=year,
         selected_month=month,
-        years=years,
+        selected_month_year=f'{selected_month_date.year}-{selected_month_date.month:02d}',
+        month_year_options=month_year_options,
         month_names=MONTH_NAMES,
         include_holidays=include_holidays,
         include_islamic=include_islamic,
@@ -52,6 +85,12 @@ def index():
         weekday_names=context['weekday_names'],
         month_name=context['month_name'],
     )
+
+
+def _add_months(value: date, delta_months: int) -> date:
+    total_months = (value.year * 12 + (value.month - 1)) + delta_months
+    year, month_index = divmod(total_months, 12)
+    return date(year, month_index + 1, 1)
 
 
 @bp.get('/api/event/<int:event_id>')

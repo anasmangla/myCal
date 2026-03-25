@@ -18,7 +18,16 @@ function simpleUSHolidays(year, month) {
   return map;
 }
 
-export function renderCalendar({ state, onSelectDate, onOpenEvent, onOpenActions, onDropImage }) {
+export function renderCalendar({
+  state,
+  onSelectDate,
+  onOpenEvent,
+  onOpenActions,
+  onDateContext,
+  onEventContext,
+  onMoveEvent,
+  onDropImage,
+}) {
   if (!weekdayBuilt) {
     const weekdayHeader = document.getElementById('weekdayHeader');
     WEEKDAY_NAMES.forEach((name) => {
@@ -77,6 +86,10 @@ export function renderCalendar({ state, onSelectDate, onOpenEvent, onOpenActions
 
         cell.addEventListener('click', () => onSelectDate(key));
         cell.addEventListener('dblclick', () => onOpenEvent({ startDate: key, endDate: key }));
+        cell.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          onDateContext({ date: key, x: event.pageX, y: event.pageY });
+        });
         cell.querySelector('.date-action-btn').addEventListener('click', (event) => {
           event.stopPropagation();
           onOpenActions(key, event);
@@ -89,6 +102,18 @@ export function renderCalendar({ state, onSelectDate, onOpenEvent, onOpenActions
         cell.addEventListener('drop', (event) => {
           event.preventDefault();
           cell.classList.remove('drop-target');
+          const dragPayload = event.dataTransfer?.getData('text/plain');
+          if (dragPayload) {
+            try {
+              const parsed = JSON.parse(dragPayload);
+              if (parsed?.eventId && parsed?.anchorDate) {
+                onMoveEvent({ eventId: parsed.eventId, targetDate: key, anchorDate: parsed.anchorDate });
+                return;
+              }
+            } catch (error) {
+              // Fall through to image drop handling.
+            }
+          }
           onDropImage(key, event.dataTransfer?.files || []);
         });
       } else {
@@ -105,7 +130,25 @@ export function renderCalendar({ state, onSelectDate, onOpenEvent, onOpenActions
         chip.title = item.title || item.displayText;
         chip.addEventListener('click', (e) => {
           e.preventDefault();
+          e.stopPropagation();
           if (item.sourceEventId) onOpenEvent(item.sourceEventId);
+        });
+        chip.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!item.sourceEventId || item.isHoliday) return;
+          onEventContext({
+            eventId: item.sourceEventId,
+            occurrenceDate: item.occurrenceDate || key,
+            x: event.pageX,
+            y: event.pageY,
+          });
+        });
+        chip.draggable = Boolean(item.sourceEventId && !item.isHoliday);
+        chip.addEventListener('dragstart', (event) => {
+          if (!item.sourceEventId || item.isHoliday) return;
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.sourceEventId, anchorDate: item.occurrenceDate || key }));
         });
         list.appendChild(chip);
       });

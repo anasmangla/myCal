@@ -12,12 +12,13 @@ import { openCellEditor, saveCellFromPanel } from '../features/cell-editor.js';
 import { setCellColor } from '../features/cell-colors.js';
 import { addImageToCell } from '../features/attachments.js';
 import { exportDocumentJson, parseImportJson } from '../features/import-export.js';
-import { buildSummary, nativeShareOrCopy, whatsappLink, emailLink } from '../features/share.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
 import { searchDocument } from '../features/search.js';
 
 let eventModal;
+let activeDateContext = '';
+let activeEventContext = { eventId: '', occurrenceDate: '' };
 
 function uuid() {
   return crypto.randomUUID ? crypto.randomUUID() : `doc_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -36,11 +37,16 @@ function syncTitle() {
 }
 
 function fillSelects() {
-  const monthSel = document.getElementById('monthSelect');
-  MONTH_NAMES.forEach((name, i) => monthSel.add(new Option(name, String(i + 1))));
-  const defaults = firstVisibleMonth();
-  const yearSel = document.getElementById('yearSelect');
-  for (let y = defaults.year - 3; y <= defaults.year + 7; y += 1) yearSel.add(new Option(String(y), String(y)));
+  const now = new Date();
+  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthYearSel = document.getElementById('monthYearSelect');
+  for (let offset = -6; offset <= 12; offset += 1) {
+    const valueDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
+    const year = valueDate.getUTCFullYear();
+    const month = valueDate.getUTCMonth() + 1;
+    const label = `${MONTH_NAMES[month - 1]} ${year}`;
+    monthYearSel.add(new Option(label, `${year}-${String(month).padStart(2, '0')}`));
+  }
   AUDIENCE_CHOICES.forEach((v) => document.getElementById('audience').add(new Option(v, v)));
   RECURRENCE_CHOICES.forEach((v) => document.getElementById('recurrenceType').add(new Option(v[0].toUpperCase() + v.slice(1), v)));
   const wk = document.getElementById('weekdayCheckboxes');
@@ -69,8 +75,7 @@ function renderUnscheduled() {
 
 function rerender() {
   syncTitle();
-  document.getElementById('monthSelect').value = String(appState.view.month);
-  document.getElementById('yearSelect').value = String(appState.view.year);
+  document.getElementById('monthYearSelect').value = `${appState.view.year}-${String(appState.view.month).padStart(2, '0')}`;
   document.getElementById('islamicToggle').checked = appState.doc.settings.showIslamicDates;
   document.getElementById('holidaysToggle').checked = appState.doc.settings.showUSHolidays;
   renderCalendar({
@@ -78,6 +83,15 @@ function rerender() {
     onSelectDate: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
     onOpenEvent: (payload) => openEventModal(payload),
     onOpenActions: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
+    onDateContext: ({ date, x, y }) => {
+      activeDateContext = date;
+      showMenu(document.getElementById('dateContextMenu'), x, y);
+    },
+    onEventContext: ({ eventId, occurrenceDate, x, y }) => {
+      activeEventContext = { eventId, occurrenceDate };
+      showMenu(document.getElementById('eventContextMenu'), x, y);
+    },
+    onMoveEvent: ({ eventId, targetDate, anchorDate }) => moveEvent(eventId, targetDate, anchorDate),
     onDropImage: async (date, files) => {
       const file = Array.from(files)[0];
       if (!file) return;
@@ -86,6 +100,42 @@ function rerender() {
     },
   });
   renderUnscheduled();
+}
+
+function showMenu(menu, x, y) {
+  hideMenus();
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  menu.classList.remove('d-none');
+}
+
+function hideMenus() {
+  document.querySelectorAll('.context-menu').forEach((menu) => menu.classList.add('d-none'));
+}
+
+function shiftIsoDate(iso, deltaDays) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function moveEvent(eventId, targetDate, anchorDate) {
+  const existing = appState.doc.events.find((item) => item.id === eventId);
+  if (!existing || !targetDate || !anchorDate) return;
+  const source = new Date(`${anchorDate}T00:00:00Z`);
+  const target = new Date(`${targetDate}T00:00:00Z`);
+  const delta = Math.round((target - source) / 86400000);
+  if (!Number.isFinite(delta) || delta === 0) return;
+  const updated = {
+    ...existing,
+    startDate: shiftIsoDate(existing.startDate, delta),
+    endDate: shiftIsoDate(existing.endDate, delta),
+  };
+  const index = appState.doc.events.findIndex((item) => item.id === eventId);
+  if (index < 0) return;
+  appState.doc.events[index] = updated;
+  schedulePersist(appState.doc, 'event-move', setLastSaved);
+  rerender();
 }
 
 function setLastSaved(ts) {
@@ -134,8 +184,9 @@ async function loadOrCreateDoc(year, month) {
 function bindMainUI() {
   document.getElementById('calendarControls').addEventListener('submit', async (event) => {
     event.preventDefault();
-    appState.view.month = Number(document.getElementById('monthSelect').value);
-    appState.view.year = Number(document.getElementById('yearSelect').value);
+    const [yearText, monthText] = document.getElementById('monthYearSelect').value.split('-');
+    appState.view.month = Number(monthText);
+    appState.view.year = Number(yearText);
     appState.doc = await loadOrCreateDoc(appState.view.year, appState.view.month);
     saveActiveMonth(monthIso(appState.view.year, appState.view.month));
     rerender();
@@ -243,20 +294,6 @@ function bindMainUI() {
     }
   });
 
-  document.getElementById('copySummaryBtn').addEventListener('click', async () => {
-    const text = buildSummary(appState.doc, { detailed: false, includePrivate: false });
-    const mode = await nativeShareOrCopy(text);
-    flash(mode === 'shared' ? 'Shared successfully.' : 'Summary copied.');
-  });
-  document.getElementById('whatsappSummaryBtn').addEventListener('click', () => {
-    const text = buildSummary(appState.doc, { detailed: false, includePrivate: false });
-    window.open(whatsappLink(text), '_blank', 'noopener');
-  });
-  document.getElementById('emailSummaryBtn').addEventListener('click', () => {
-    const text = buildSummary(appState.doc, { detailed: true, includePrivate: false });
-    window.location.href = emailLink(appState.doc, text);
-  });
-
   document.getElementById('printBtn').addEventListener('click', printCalendar);
   document.getElementById('exportImageBtn').addEventListener('click', async () => {
     try { await exportCalendarImage(); } catch { flash('Image export failed.', 'danger'); }
@@ -296,6 +333,42 @@ function bindMainUI() {
     appState.undoStack.push(structuredClone(appState.doc));
     appState.doc = next;
     rerender();
+  });
+  document.getElementById('contextAddEvent').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    openEventModal({ startDate: activeDateContext, endDate: activeDateContext });
+  });
+  document.getElementById('contextModifyEvent').addEventListener('click', () => {
+    hideMenus();
+    if (!activeEventContext.eventId) return;
+    openEventModal(activeEventContext.eventId);
+  });
+  document.getElementById('contextMoveEvent').addEventListener('click', () => {
+    hideMenus();
+    const { eventId, occurrenceDate } = activeEventContext;
+    if (!eventId || !occurrenceDate) return;
+    const nextDate = window.prompt('Move event to start on (YYYY-MM-DD):', occurrenceDate);
+    if (!nextDate || !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return;
+    moveEvent(eventId, nextDate, occurrenceDate);
+  });
+  document.getElementById('contextDeleteEvent').addEventListener('click', () => {
+    hideMenus();
+    const { eventId } = activeEventContext;
+    if (!eventId) return;
+    appState.doc.events = appState.doc.events.filter((item) => item.id !== eventId);
+    schedulePersist(appState.doc, 'event-delete', setLastSaved);
+    rerender();
+  });
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.context-menu')) hideMenus();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideMenus();
+  });
+  document.querySelectorAll('.context-menu').forEach((menu) => {
+    menu.addEventListener('contextmenu', (event) => event.preventDefault());
+    menu.addEventListener('click', (event) => event.stopPropagation());
   });
   renderUnscheduled();
 }
