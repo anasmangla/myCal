@@ -194,9 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
-          const response = await fetch(`/api/event/${item.source_event_id}`);
-          const payload = await response.json();
-          openEventModal(payload);
+          await openEventById(item.source_event_id);
+        });
+        chip.addEventListener('dblclick', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (item.is_holiday || !item.source_event_id) return;
+          await openEventById(item.source_event_id);
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
@@ -275,13 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('contextModifyEvent').addEventListener('click', async () => {
     hideMenus();
     if (!activeEventId) return;
-    const response = await fetch(`/api/event/${activeEventId}`);
-    if (!response.ok) {
-      showValidation('Unable to load this event right now. Please try again.');
-      return;
-    }
-    const payload = await response.json();
-    openEventModal(payload);
+    await openEventById(activeEventId);
   });
 
   document.getElementById('contextMoveEvent').addEventListener('click', () => {
@@ -329,10 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildIslamicLabels(iso) {
     const islamic = getIslamicParts(iso);
     const labels = [];
-    const dayOfMonth = Number(iso.slice(8, 10));
-
-    if (dayOfMonth === 1) labels.push({ text: `${islamic.month} ${islamic.day}`, italic: true });
-    if (islamic.day === 1) labels.push({ text: `${islamic.month} 1`, italic: false });
+    labels.push({ text: `${islamic.month} ${islamic.day}`, italic: true });
 
     const importantDay = islamicHolidayMap[`${islamic.monthNumber}-${islamic.day}`];
     if (importantDay) labels.push({ text: importantDay, italic: false, important: true });
@@ -748,6 +743,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function openEventById(eventId) {
+    const payload = await fetchEventDetails(eventId);
+    if (!payload) {
+      showValidation('Unable to load this event right now. Please try again.');
+      return;
+    }
+    openEventModal(payload);
+  }
+
   function askDeleteMode() {
     const deleteOne = window.confirm(
       'This is a recurring event.\n\nPress OK to delete only this occurrence.\nPress Cancel to choose another option.'
@@ -810,10 +814,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEvents();
   }
 
-  document.getElementById('deleteEventBtn').addEventListener('click', async () => {
-    const eventId = Number(document.getElementById('eventId').value);
-    const occurrenceDate = document.getElementById('startDate').value;
-    await submitDeleteEvent(eventId, occurrenceDate);
-    eventModal.hide();
-  });
+  const deleteEventBtn = document.getElementById('deleteEventBtn');
+  if (deleteEventBtn) {
+    deleteEventBtn.addEventListener('click', async () => {
+      const eventId = Number(document.getElementById('eventId').value);
+      const occurrenceDate = document.getElementById('startDate').value;
+      await submitDeleteEvent(eventId, occurrenceDate);
+      eventModal.hide();
+    });
+  }
 });
