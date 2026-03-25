@@ -207,6 +207,24 @@ def move_event(event_id: int):
         flash(str(exc), 'danger')
         return redirect(_return_url())
 
+    if event.recurrence_type != 'none' and anchor_raw:
+        if not _is_valid_occurrence_date(event, anchor_date):
+            flash('The selected recurring occurrence could not be moved.', 'danger')
+            return redirect(_return_url())
+
+        moved_event = _clone_event(event)
+        moved_event.start_date = target_date
+        moved_event.end_date = target_date
+        moved_event.recurrence_type = 'none'
+        moved_event.recurrence_weekdays = None
+        moved_event.day_labels = []
+        db.session.add(moved_event)
+
+        _delete_single_occurrence(event, anchor_date)
+        db.session.commit()
+        flash('Recurring occurrence moved as a standalone event.', 'success')
+        return redirect(_return_url())
+
     delta_days = (target_date - anchor_date).days
     event.start_date = event.start_date + timedelta(days=delta_days)
     event.end_date = event.end_date + timedelta(days=delta_days)
