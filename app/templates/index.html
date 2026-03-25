@@ -8,16 +8,9 @@
     </div>
     <form class="row g-2 align-items-center" method="get">
       <div class="col-auto">
-        <select class="form-select" name="month" aria-label="Month">
-          {% for month_name in month_names %}
-          <option value="{{ loop.index }}" {% if loop.index == selected_month %}selected{% endif %}>{{ month_name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-auto">
-        <select class="form-select" name="year" aria-label="Year">
-          {% for year in years %}
-          <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+        <select class="form-select" name="month_year" aria-label="Month and year">
+          {% for option in month_year_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month_year %}selected{% endif %}>{{ option.label }}</option>
           {% endfor %}
         </select>
       </div>

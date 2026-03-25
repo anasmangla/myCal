@@ -37,6 +37,7 @@ export function visibleEventMap(events, visibleStartIso, visibleEndIso) {
         grouped[key] ||= [];
         grouped[key].push({
           sourceEventId: event.id,
+          occurrenceDate: key,
           isHoliday: false,
           title: event.title,
           displayText: formatOccurrenceDisplay(label, event.startTime, event.location, event.allDay),
@@ -57,6 +58,7 @@ export function visibleEventMap(events, visibleStartIso, visibleEndIso) {
       grouped[key] ||= [];
       grouped[key].push({
         sourceEventId: event.id,
+        occurrenceDate: key,
         isHoliday: false,
         title: event.title,
         displayText: formatOccurrenceDisplay(event.title, event.startTime, event.location, event.allDay),

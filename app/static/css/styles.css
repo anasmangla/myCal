@@ -324,9 +324,24 @@ body {
 }
 
 .context-menu {
-  z-index: 2000;
-  min-width: 220px;
+  z-index: 2500;
+  min-width: 250px;
   overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 0.65rem;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.context-menu .dropdown-item {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 0.8rem;
+}
+
+.context-menu .dropdown-item:hover,
+.context-menu .dropdown-item:focus-visible {
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .calendar-cell.selected-day[data-in-month="true"] {
