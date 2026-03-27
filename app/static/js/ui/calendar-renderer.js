@@ -76,6 +76,7 @@ export function renderCalendar({
   onSelectDate,
   onOpenEvent,
   onOpenActions,
+  onEditCellText,
   onDateContext,
   onEventContext,
   onMoveEvent,
@@ -116,7 +117,8 @@ export function renderCalendar({
       const key = isoDate(day);
       const inMonth = day.getUTCMonth() === month - 1;
       const cellData = state.doc.cells[key];
-      const preview = cellData?.contentType === 'rich-html' ? '' : previewText(cellData?.plainText || '', 80);
+      const rawText = cellData?.plainText || '';
+      const preview = cellData?.contentType === 'rich-html' ? '' : previewText(rawText, inMonth ? 80 : 180);
 
       const cell = document.createElement('div');
       cell.className = `calendar-cell day-cell ${inMonth ? '' : 'outside-month'}`;
@@ -141,7 +143,7 @@ export function renderCalendar({
           <div class="cell-image-strip"></div>
         `;
 
-        cell.addEventListener('click', () => onSelectDate(key));
+        cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: true }));
         cell.addEventListener('dblclick', () => onOpenEvent({ startDate: key, endDate: key }));
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
@@ -171,10 +173,27 @@ export function renderCalendar({
               // Fall through to image drop handling.
             }
           }
-          onDropImage(key, event.dataTransfer?.files || []);
         });
       } else {
-        cell.innerHTML = '<div class="outside-month-fill"></div>';
+        cell.innerHTML = `
+          <div class="outside-month-fill extra-cell-fill">
+            <div class="cell-note-preview ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
+            <div class="cell-image-strip"></div>
+          </div>
+        `;
+        cell.tabIndex = 0;
+        cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: false }));
+        cell.addEventListener('dblclick', () => onEditCellText(key));
+        cell.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          cell.classList.add('drop-target');
+        });
+        cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+        cell.addEventListener('drop', (event) => {
+          event.preventDefault();
+          cell.classList.remove('drop-target');
+          onDropImage(key, event.dataTransfer?.files || []);
+        });
       }
 
       const list = cell.querySelector('.event-list');
@@ -212,15 +231,23 @@ export function renderCalendar({
 
       if (cellData?.attachments?.length) {
         const strip = cell.querySelector('.cell-image-strip');
-        cellData.attachments.slice(0, 3).forEach((attId) => {
+        const attachIds = inMonth ? cellData.attachments.slice(0, 3) : cellData.attachments.slice(0, 1);
+        attachIds.forEach((attId, index) => {
           const att = state.doc.attachments[attId];
           if (!att?.thumbnailDataUrl) return;
           const img = document.createElement('img');
           img.src = att.thumbnailDataUrl;
           img.alt = att.altText || att.name || 'Cell image';
-          img.className = 'cell-thumb';
+          img.className = index === 0 && !inMonth ? 'cell-thumb cell-thumb-primary' : 'cell-thumb';
           strip.appendChild(img);
         });
+      }
+
+      if (!inMonth && preview) {
+        const previewNode = cell.querySelector('.cell-note-preview');
+        const length = rawText.trim().length;
+        previewNode.classList.add('cell-note-fit');
+        previewNode.classList.add(length <= 30 ? 'note-size-lg' : length <= 90 ? 'note-size-md' : 'note-size-sm');
       }
 
       if (inMonth) {

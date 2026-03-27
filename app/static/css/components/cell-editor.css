@@ -2,3 +2,27 @@
   border-top: 1px dashed rgba(100, 116, 139, 0.3);
   padding-top: 0.2rem;
 }
+
+.cell-note-fit {
+  flex: 1 1 auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+}
+
+.note-size-lg {
+  font-size: 0.85rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.note-size-md {
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.note-size-sm {
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
