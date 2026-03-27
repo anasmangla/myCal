@@ -85,6 +85,7 @@ function rerender() {
     onOpenActions: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
     onDateContext: ({ date, x, y }) => {
       activeDateContext = date;
+      updateDateContextLabels(date);
       showMenu(document.getElementById('dateContextMenu'), x, y);
     },
     onEventContext: ({ eventId, occurrenceDate, x, y }) => {
@@ -111,6 +112,36 @@ function showMenu(menu, x, y) {
 
 function hideMenus() {
   document.querySelectorAll('.context-menu').forEach((menu) => menu.classList.add('d-none'));
+}
+
+function hiddenDateSet(type) {
+  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = { holidays: [], islamic: [] });
+  const values = Array.isArray(hiddenMeta[type]) ? hiddenMeta[type] : [];
+  return new Set(values);
+}
+
+function setHiddenDateSet(type, values) {
+  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = { holidays: [], islamic: [] });
+  hiddenMeta[type] = Array.from(values);
+}
+
+function updateDateContextLabels(date) {
+  const holidayBtn = document.getElementById('contextToggleHoliday');
+  const islamicBtn = document.getElementById('contextToggleIslamic');
+  const holidayHidden = hiddenDateSet('holidays').has(date);
+  const islamicHidden = hiddenDateSet('islamic').has(date);
+  holidayBtn.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
+  islamicBtn.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
+  holidayBtn.disabled = !appState.doc.settings.showUSHolidays;
+  islamicBtn.disabled = !appState.doc.settings.showIslamicDates;
+}
+
+function toggleHiddenDate(type, date) {
+  if (!date) return;
+  const values = hiddenDateSet(type);
+  if (values.has(date)) values.delete(date);
+  else values.add(date);
+  setHiddenDateSet(type, values);
 }
 
 function shiftIsoDate(iso, deltaDays) {
@@ -338,6 +369,20 @@ function bindMainUI() {
     hideMenus();
     if (!activeDateContext) return;
     openEventModal({ startDate: activeDateContext, endDate: activeDateContext });
+  });
+  document.getElementById('contextToggleHoliday').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    toggleHiddenDate('holidays', activeDateContext);
+    schedulePersist(appState.doc, 'settings', setLastSaved);
+    rerender();
+  });
+  document.getElementById('contextToggleIslamic').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    toggleHiddenDate('islamic', activeDateContext);
+    schedulePersist(appState.doc, 'settings', setLastSaved);
+    rerender();
   });
   document.getElementById('contextModifyEvent').addEventListener('click', () => {
     hideMenus();

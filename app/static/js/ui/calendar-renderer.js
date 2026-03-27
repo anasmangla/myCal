@@ -5,6 +5,41 @@ import { previewText, escapeHtml } from '../utils/text.js';
 import { contrastTextColor } from '../utils/colors.js';
 
 let weekdayBuilt = false;
+const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+const islamicNumericFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
+const islamicHolidayMap = {
+  '1-1': 'Islamic New Year',
+  '1-10': 'Ashura',
+  '3-12': 'Mawlid',
+  '7-27': 'Isra & Miraj',
+  '9-1': 'Ramadan begins',
+  '9-27': 'Laylat al-Qadr (approx.)',
+  '10-1': 'Eid al-Fitr',
+  '12-8': 'Day of Arafah',
+  '12-10': 'Eid al-Adha',
+  '12-11': 'Days of Tashriq',
+  '12-12': 'Days of Tashriq',
+  '12-13': 'Days of Tashriq',
+};
+
+function getIslamicParts(iso) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  const parts = islamicFormatter.formatToParts(date);
+  const numericParts = islamicNumericFormatter.formatToParts(date);
+  return {
+    month: parts.find((part) => part.type === 'month')?.value || '',
+    monthNumber: Number(numericParts.find((part) => part.type === 'month')?.value || 0),
+    day: Number(parts.find((part) => part.type === 'day')?.value || 0),
+  };
+}
+
+function buildIslamicLabels(iso) {
+  const islamic = getIslamicParts(iso);
+  const labels = [{ text: `${islamic.month} ${islamic.day}`, italic: true, important: false }];
+  const importantDay = islamicHolidayMap[`${islamic.monthNumber}-${islamic.day}`];
+  if (importantDay) labels.push({ text: importantDay, italic: false, important: true });
+  return labels;
+}
 
 function simpleUSHolidays(year, month) {
   const map = new Map();
@@ -47,8 +82,11 @@ export function renderCalendar({
   const visibleEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const events = visibleEventMap(state.doc.events, visibleStart, visibleEnd);
+  const hiddenHolidayDates = new Set(state.doc.settings?.hiddenMeta?.holidays || []);
+  const hiddenIslamicDates = new Set(state.doc.settings?.hiddenMeta?.islamic || []);
   const holidays = state.doc.settings.showUSHolidays ? simpleUSHolidays(year, month) : new Map();
   holidays.forEach((name, key) => {
+    if (hiddenHolidayDates.has(key)) return;
     events[key] ||= [];
     events[key].unshift({ isHoliday: true, displayText: name, color: '#7c3aed', title: name });
   });
@@ -79,6 +117,7 @@ export function renderCalendar({
             <button type="button" class="btn btn-sm btn-light date-action-btn no-print">⋮</button>
             <div class="day-number">${day.getUTCDate()}</div>
           </div>
+          <div class="holiday-pill small"></div>
           <div class="event-list"></div>
           <div class="cell-note-preview ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
           <div class="cell-image-strip"></div>
@@ -164,6 +203,24 @@ export function renderCalendar({
           img.className = 'cell-thumb';
           strip.appendChild(img);
         });
+      }
+
+      if (inMonth) {
+        const lines = [];
+        const holidayLabel = holidays.get(key);
+        if (holidayLabel && !hiddenHolidayDates.has(key)) {
+          lines.push(`<span class="calendar-meta-line">${escapeHtml(holidayLabel)}</span>`);
+        }
+        if (state.doc.settings.showIslamicDates && !hiddenIslamicDates.has(key)) {
+          buildIslamicLabels(key).forEach((label) => {
+            lines.push(
+              `<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${escapeHtml(label.text)}</span>`
+            );
+          });
+        }
+        const holidayPill = cell.querySelector('.holiday-pill');
+        holidayPill.innerHTML = lines.join('');
+        holidayPill.classList.toggle('has-content', lines.length > 0);
       }
 
       monthGrid.appendChild(cell);
