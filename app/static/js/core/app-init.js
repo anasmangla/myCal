@@ -80,9 +80,18 @@ function rerender() {
   document.getElementById('holidaysToggle').checked = appState.doc.settings.showUSHolidays;
   renderCalendar({
     state: appState,
-    onSelectDate: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
+    onSelectDate: ({ date, inMonth }) => {
+      appState.activeDate = date;
+      if (!inMonth) openCellEditor({ state: appState, date });
+      else document.getElementById('sidePanel').classList.add('d-none');
+      rerender();
+    },
     onOpenEvent: (payload) => openEventModal(payload),
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+    onOpenActions: (date) => openEventModal({ startDate: date, endDate: date }),
+=======
     onOpenActions: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
+>>>>>>> main
     onEditCellText: (date) => {
       appState.activeDate = date;
       openCellEditor({ state: appState, date });
@@ -153,6 +162,12 @@ function shiftIsoDate(iso, deltaDays) {
   const date = new Date(`${iso}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + deltaDays);
   return date.toISOString().slice(0, 10);
+}
+
+function isOutsideVisibleMonth(iso) {
+  if (!iso) return false;
+  const monthPrefix = `${appState.view.year}-${String(appState.view.month).padStart(2, '0')}`;
+  return !iso.startsWith(monthPrefix);
 }
 
 function moveEvent(eventId, targetDate, anchorDate) {
@@ -289,13 +304,14 @@ function bindMainUI() {
 
   bindSidePanel({
     onSaveCell: () => {
+      if (!isOutsideVisibleMonth(appState.activeDate)) return;
       pushUndo(appState.doc);
       saveCellFromPanel({ state: appState });
       schedulePersist(appState.doc, 'cell-note', setLastSaved);
       rerender();
     },
     onAddImage: async (files) => {
-      if (!appState.activeDate || !files.length) return;
+      if (!appState.activeDate || !files.length || !isOutsideVisibleMonth(appState.activeDate)) return;
       await addImageToCell({ state: appState, date: appState.activeDate, file: files[0] });
       schedulePersist(appState.doc, 'attachment', setLastSaved);
       rerender();
@@ -303,14 +319,22 @@ function bindMainUI() {
   });
 
   document.getElementById('cellBgColor').addEventListener('input', (e) => {
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+    if (!appState.activeDate || !isOutsideVisibleMonth(appState.activeDate)) return;
+=======
     if (!appState.activeDate) return;
+>>>>>>> main
     const textColor = document.getElementById('cellTextColor').value;
     setCellColor(appState.doc, appState.activeDate, e.target.value, textColor);
     schedulePersist(appState.doc, 'cell-color', setLastSaved);
     rerender();
   });
   document.getElementById('cellTextColor').addEventListener('input', (e) => {
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+    if (!appState.activeDate || !isOutsideVisibleMonth(appState.activeDate)) return;
+=======
     if (!appState.activeDate) return;
+>>>>>>> main
     const activeCell = appState.doc.cells[appState.activeDate];
     if (!activeCell) return;
     activeCell.textColor = e.target.value || null;
@@ -318,7 +342,7 @@ function bindMainUI() {
     rerender();
   });
   document.getElementById('clearCellColorBtn').addEventListener('click', () => {
-    if (!appState.activeDate) return;
+    if (!appState.activeDate || !isOutsideVisibleMonth(appState.activeDate)) return;
     setCellColor(appState.doc, appState.activeDate, null);
     schedulePersist(appState.doc, 'cell-color-clear', setLastSaved);
     rerender();

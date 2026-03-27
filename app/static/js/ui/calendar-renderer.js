@@ -118,7 +118,11 @@ export function renderCalendar({
       const inMonth = day.getUTCMonth() === month - 1;
       const cellData = state.doc.cells[key];
       const rawText = cellData?.plainText || '';
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+      const preview = cellData?.contentType === 'rich-html' ? '' : previewText(rawText, inMonth ? 80 : 180);
+=======
       const preview = cellData?.contentType === 'rich-html' ? '' : previewText(rawText, 180);
+>>>>>>> main
 
       const cell = document.createElement('div');
       cell.className = `calendar-cell day-cell ${inMonth ? '' : 'outside-month'}`;
@@ -143,8 +147,13 @@ export function renderCalendar({
           <div class="cell-image-strip"></div>
         `;
 
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+        cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: true }));
+        cell.addEventListener('dblclick', () => onOpenEvent({ startDate: key, endDate: key }));
+=======
         cell.addEventListener('click', () => onSelectDate(key));
         cell.addEventListener('dblclick', () => onEditCellText(key));
+>>>>>>> main
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
@@ -173,10 +182,27 @@ export function renderCalendar({
               // Fall through to image drop handling.
             }
           }
-          onDropImage(key, event.dataTransfer?.files || []);
         });
       } else {
-        cell.innerHTML = '<div class="outside-month-fill"></div>';
+        cell.innerHTML = `
+          <div class="outside-month-fill extra-cell-fill">
+            <div class="cell-note-preview ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
+            <div class="cell-image-strip"></div>
+          </div>
+        `;
+        cell.tabIndex = 0;
+        cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: false }));
+        cell.addEventListener('dblclick', () => onEditCellText(key));
+        cell.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          cell.classList.add('drop-target');
+        });
+        cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+        cell.addEventListener('drop', (event) => {
+          event.preventDefault();
+          cell.classList.remove('drop-target');
+          onDropImage(key, event.dataTransfer?.files || []);
+        });
       }
 
       const list = cell.querySelector('.event-list');
@@ -214,6 +240,10 @@ export function renderCalendar({
 
       if (cellData?.attachments?.length) {
         const strip = cell.querySelector('.cell-image-strip');
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+        const attachIds = inMonth ? cellData.attachments.slice(0, 3) : cellData.attachments.slice(0, 1);
+        attachIds.forEach((attId, index) => {
+=======
         const firstAttachment = cellData.attachments[0];
         if (firstAttachment) {
           const att = state.doc.attachments[firstAttachment];
@@ -226,17 +256,22 @@ export function renderCalendar({
           }
         }
         cellData.attachments.slice(1, 3).forEach((attId) => {
+>>>>>>> main
           const att = state.doc.attachments[attId];
           if (!att?.thumbnailDataUrl) return;
           const img = document.createElement('img');
           img.src = att.thumbnailDataUrl;
           img.alt = att.altText || att.name || 'Cell image';
-          img.className = 'cell-thumb';
+          img.className = index === 0 && !inMonth ? 'cell-thumb cell-thumb-primary' : 'cell-thumb';
           strip.appendChild(img);
         });
       }
 
+<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
+      if (!inMonth && preview) {
+=======
       if (preview) {
+>>>>>>> main
         const previewNode = cell.querySelector('.cell-note-preview');
         const length = rawText.trim().length;
         previewNode.classList.add('cell-note-fit');
