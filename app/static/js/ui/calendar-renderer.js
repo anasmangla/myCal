@@ -26,13 +26,48 @@ function buildIslamicLabels(iso) {
 
 function simpleUSHolidays(year, month) {
   const map = new Map();
-  const add = (m, d, label) => {
-    if (m === month) map.set(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`, label);
+  const pushHoliday = (date, label) => {
+    const holidayMonth = date.getUTCMonth() + 1;
+    if (holidayMonth !== month) return;
+    map.set(isoDate(date), label);
   };
-  add(1, 1, "New Year's Day");
-  add(7, 4, 'Independence Day');
-  add(11, 11, 'Veterans Day');
-  add(12, 25, 'Christmas Day');
+  const fixedHoliday = (m, d, label) => {
+    const date = new Date(Date.UTC(year, m - 1, d));
+    pushHoliday(date, label);
+
+    const weekday = date.getUTCDay();
+    if (weekday === 6) {
+      const observed = new Date(date);
+      observed.setUTCDate(observed.getUTCDate() - 1);
+      pushHoliday(observed, `${label} (observed)`);
+    } else if (weekday === 0) {
+      const observed = new Date(date);
+      observed.setUTCDate(observed.getUTCDate() + 1);
+      pushHoliday(observed, `${label} (observed)`);
+    }
+  };
+  const nthWeekday = (m, weekday, ordinal, label) => {
+    const firstDay = new Date(Date.UTC(year, m - 1, 1)).getUTCDay();
+    const day = 1 + ((7 + weekday - firstDay) % 7) + ((ordinal - 1) * 7);
+    pushHoliday(new Date(Date.UTC(year, m - 1, day)), label);
+  };
+  const lastWeekday = (m, weekday, label) => {
+    const lastDate = new Date(Date.UTC(year, m, 0));
+    const day = lastDate.getUTCDate() - ((7 + lastDate.getUTCDay() - weekday) % 7);
+    pushHoliday(new Date(Date.UTC(year, m - 1, day)), label);
+  };
+
+  fixedHoliday(1, 1, "New Year's Day");
+  nthWeekday(1, 1, 3, 'Martin Luther King Jr. Day');
+  nthWeekday(2, 1, 3, "Washington's Birthday");
+  fixedHoliday(6, 19, 'Juneteenth National Independence Day');
+  fixedHoliday(7, 4, 'Independence Day');
+  nthWeekday(9, 1, 1, 'Labor Day');
+  nthWeekday(10, 1, 2, 'Columbus Day');
+  fixedHoliday(11, 11, 'Veterans Day');
+  nthWeekday(11, 4, 4, 'Thanksgiving Day');
+  fixedHoliday(12, 25, 'Christmas Day');
+  lastWeekday(5, 1, 'Memorial Day');
   return map;
 }
 
