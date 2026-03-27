@@ -11,7 +11,7 @@ export function makeEmptyDocument({ docId, month, title }) {
     subtitle: '',
     locale: 'en-US',
     settings: {
-      showIslamicDates: false,
+      showIslamicDates: true,
       showUSHolidays: true,
       hiddenMeta: { holidays: [], islamic: [] },
       shareDefaults: { includePrivateItems: false, includeImages: true, includeNotes: true },

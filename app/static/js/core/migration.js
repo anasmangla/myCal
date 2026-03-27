@@ -9,7 +9,7 @@ export function migrateLegacyState({ legacyRaw, month, docId, title }) {
   const doc = makeEmptyDocument({ month, docId, title });
 
   doc.settings.showUSHolidays = legacy.includeHolidays !== false;
-  doc.settings.showIslamicDates = legacy.includeIslamic === true;
+  doc.settings.showIslamicDates = legacy.includeIslamic !== false;
   doc.settings.hiddenMeta.holidays = legacy.hiddenMeta?.holidays || [];
   doc.settings.hiddenMeta.islamic = legacy.hiddenMeta?.islamic || [];
 

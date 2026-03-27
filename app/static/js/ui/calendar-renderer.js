@@ -6,39 +6,22 @@ import { contrastTextColor } from '../utils/colors.js';
 
 let weekdayBuilt = false;
 const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
-const islamicNumericFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
-const islamicHolidayMap = {
-  '1-1': 'Islamic New Year',
-  '1-10': 'Ashura',
-  '3-12': 'Mawlid',
-  '7-27': 'Isra & Miraj',
-  '9-1': 'Ramadan begins',
-  '9-27': 'Laylat al-Qadr (approx.)',
-  '10-1': 'Eid al-Fitr',
-  '12-8': 'Day of Arafah',
-  '12-10': 'Eid al-Adha',
-  '12-11': 'Days of Tashriq',
-  '12-12': 'Days of Tashriq',
-  '12-13': 'Days of Tashriq',
-};
 
 function getIslamicParts(iso) {
   const date = new Date(`${iso}T00:00:00Z`);
   const parts = islamicFormatter.formatToParts(date);
-  const numericParts = islamicNumericFormatter.formatToParts(date);
   return {
     month: parts.find((part) => part.type === 'month')?.value || '',
-    monthNumber: Number(numericParts.find((part) => part.type === 'month')?.value || 0),
     day: Number(parts.find((part) => part.type === 'day')?.value || 0),
   };
 }
 
 function buildIslamicLabels(iso) {
   const islamic = getIslamicParts(iso);
-  const labels = [{ text: `${islamic.month} ${islamic.day}`, italic: true, important: false }];
-  const importantDay = islamicHolidayMap[`${islamic.monthNumber}-${islamic.day}`];
-  if (importantDay) labels.push({ text: importantDay, italic: false, important: true });
-  return labels;
+  const isFirstGregorian = iso.endsWith('-01');
+  const isFirstIslamic = islamic.day === 1;
+  if (!isFirstGregorian && !isFirstIslamic) return [];
+  return [{ text: `${islamic.month} ${islamic.day}`, italic: true, important: false }];
 }
 
 function simpleUSHolidays(year, month) {
