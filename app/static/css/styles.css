@@ -231,6 +231,7 @@ body {
 }
 
 .holiday-pill {
+  display: none;
   min-height: 0;
   font-size: 0.59rem;
   line-height: 1.1;
