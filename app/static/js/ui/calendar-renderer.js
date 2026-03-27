@@ -76,6 +76,7 @@ export function renderCalendar({
   onSelectDate,
   onOpenEvent,
   onOpenActions,
+  onEditCellText,
   onDateContext,
   onEventContext,
   onMoveEvent,
@@ -116,7 +117,8 @@ export function renderCalendar({
       const key = isoDate(day);
       const inMonth = day.getUTCMonth() === month - 1;
       const cellData = state.doc.cells[key];
-      const preview = cellData?.contentType === 'rich-html' ? '' : previewText(cellData?.plainText || '', 80);
+      const rawText = cellData?.plainText || '';
+      const preview = cellData?.contentType === 'rich-html' ? '' : previewText(rawText, 180);
 
       const cell = document.createElement('div');
       cell.className = `calendar-cell day-cell ${inMonth ? '' : 'outside-month'}`;
@@ -142,7 +144,7 @@ export function renderCalendar({
         `;
 
         cell.addEventListener('click', () => onSelectDate(key));
-        cell.addEventListener('dblclick', () => onOpenEvent({ startDate: key, endDate: key }));
+        cell.addEventListener('dblclick', () => onEditCellText(key));
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
@@ -212,7 +214,18 @@ export function renderCalendar({
 
       if (cellData?.attachments?.length) {
         const strip = cell.querySelector('.cell-image-strip');
-        cellData.attachments.slice(0, 3).forEach((attId) => {
+        const firstAttachment = cellData.attachments[0];
+        if (firstAttachment) {
+          const att = state.doc.attachments[firstAttachment];
+          if (att?.thumbnailDataUrl) {
+            const img = document.createElement('img');
+            img.src = att.thumbnailDataUrl;
+            img.alt = att.altText || att.name || 'Cell image';
+            img.className = 'cell-thumb cell-thumb-primary';
+            strip.appendChild(img);
+          }
+        }
+        cellData.attachments.slice(1, 3).forEach((attId) => {
           const att = state.doc.attachments[attId];
           if (!att?.thumbnailDataUrl) return;
           const img = document.createElement('img');
@@ -221,6 +234,13 @@ export function renderCalendar({
           img.className = 'cell-thumb';
           strip.appendChild(img);
         });
+      }
+
+      if (preview) {
+        const previewNode = cell.querySelector('.cell-note-preview');
+        const length = rawText.trim().length;
+        previewNode.classList.add('cell-note-fit');
+        previewNode.classList.add(length <= 30 ? 'note-size-lg' : length <= 90 ? 'note-size-md' : 'note-size-sm');
       }
 
       if (inMonth) {

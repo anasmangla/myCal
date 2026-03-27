@@ -1,14 +1,23 @@
 .cell-image-strip {
   display: flex;
-  gap: 0.2rem;
+  flex-wrap: wrap;
+  gap: 0.25rem;
   margin-top: 0.2rem;
-  min-height: 24px;
+  min-height: 0;
 }
 
 .cell-thumb {
-  width: 24px;
-  height: 24px;
+  width: 1.1rem;
+  height: 1.1rem;
   object-fit: cover;
   border-radius: 4px;
   border: 1px solid rgba(100, 116, 139, 0.4);
+}
+
+.cell-thumb-primary {
+  width: min(100%, 6rem);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.45);
 }

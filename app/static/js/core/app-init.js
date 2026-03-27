@@ -83,6 +83,11 @@ function rerender() {
     onSelectDate: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
     onOpenEvent: (payload) => openEventModal(payload),
     onOpenActions: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
+    onEditCellText: (date) => {
+      appState.activeDate = date;
+      openCellEditor({ state: appState, date });
+      document.getElementById('cellNoteInput').focus();
+    },
     onDateContext: ({ date, x, y }) => {
       activeDateContext = date;
       updateDateContextLabels(date);
@@ -299,8 +304,17 @@ function bindMainUI() {
 
   document.getElementById('cellBgColor').addEventListener('input', (e) => {
     if (!appState.activeDate) return;
-    setCellColor(appState.doc, appState.activeDate, e.target.value);
+    const textColor = document.getElementById('cellTextColor').value;
+    setCellColor(appState.doc, appState.activeDate, e.target.value, textColor);
     schedulePersist(appState.doc, 'cell-color', setLastSaved);
+    rerender();
+  });
+  document.getElementById('cellTextColor').addEventListener('input', (e) => {
+    if (!appState.activeDate) return;
+    const activeCell = appState.doc.cells[appState.activeDate];
+    if (!activeCell) return;
+    activeCell.textColor = e.target.value || null;
+    schedulePersist(appState.doc, 'cell-text-color', setLastSaved);
     rerender();
   });
   document.getElementById('clearCellColorBtn').addEventListener('click', () => {

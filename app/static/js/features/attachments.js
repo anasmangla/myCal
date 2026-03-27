@@ -10,9 +10,17 @@ function uuid() {
 export async function addImageToCell({ state, date, file }) {
   if (!isImageFile(file)) throw new Error('Only image files are supported.');
   const id = uuid();
-  const { width, height, dataUrl } = await imageDimensions(file);
+  const { dataUrl, size } = await cropImageToSquare(file);
   await putAttachment(`attachment_${id}`, dataUrl);
-  const meta = createAttachmentMeta({ id, parentType: 'cell', parentId: date, file, thumbnailDataUrl: dataUrl, width, height });
+  const meta = createAttachmentMeta({
+    id,
+    parentType: 'cell',
+    parentId: date,
+    file,
+    thumbnailDataUrl: dataUrl,
+    width: size,
+    height: size,
+  });
   state.doc.attachments[id] = meta;
   const cell = ensureCell(state.doc, date);
   cell.attachments.push(id);
@@ -30,4 +38,23 @@ function dataUrlToFile(dataUrl, name, type) {
   const u8arr = new Uint8Array(n);
   while (n--) u8arr[n] = bstr.charCodeAt(n);
   return new File([u8arr], name, { type });
+}
+
+async function cropImageToSquare(file) {
+  const { width, height, dataUrl } = await imageDimensions(file);
+  const size = Math.max(1, Math.min(width, height));
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  const offsetX = Math.floor((width - size) / 2);
+  const offsetY = Math.floor((height - size) / 2);
+  context.drawImage(image, offsetX, offsetY, size, size, 0, 0, size, size);
+  return {
+    dataUrl: canvas.toDataURL('image/jpeg', 0.92),
+    size,
+  };
 }
