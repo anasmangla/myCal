@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applyDateStyles();
   renderEvents();
-  setupDaySelection();
   setupCalendarTitle();
   setupPrintButtons();
   setupCalendarScaling();
@@ -55,6 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
+    cell.title = 'Left click: options • Right click: options • Double click: add event';
+    cell.addEventListener('click', () => {
+      activeDate = cell.dataset.date;
+      showMenuNearCell(dateMenu, cell);
+    });
     cell.addEventListener('dblclick', () => {
       activeDate = cell.dataset.date;
       openEventModal({ start_date: activeDate, end_date: activeDate });
@@ -296,24 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
     submitMoveEvent(activeEventId, nextStart, activeEventOccurrenceDate || '');
   });
 
-  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
-  function getIslamicParts(iso) {
-    const date = new Date(`${iso}T00:00:00Z`);
-    const parts = islamicFormatter.formatToParts(date);
-    return {
-      month: parts.find((part) => part.type === 'month')?.value || '',
-      day: Number(parts.find((part) => part.type === 'day')?.value || 0),
-    };
-  }
-
-  function buildIslamicLabels(iso) {
-    const islamic = getIslamicParts(iso);
-    const isFirstGregorian = iso.endsWith('-01');
-    const isFirstIslamic = islamic.day === 1;
-    if (!isFirstGregorian && !isFirstIslamic) return [];
-    return [{ text: `${islamic.month} ${islamic.day}`, italic: true }];
-  }
-
   function applyDateStyles() {
     document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
       const iso = cell.dataset.date;
@@ -326,40 +312,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.longWeekends.includes(iso)) cell.classList.add('long-weekend');
       if (data.styles[iso]) cell.style.background = data.styles[iso];
       const holidayPill = cell.querySelector('.holiday-pill');
-      const lines = [];
-      if (showHoliday) {
-        lines.push(`<span class="calendar-meta-line">${data.holidays[iso]}</span>`);
+      if (holidayPill) {
+        holidayPill.innerHTML = '';
+        holidayPill.classList.remove('holiday-pill-long', 'has-content');
       }
-      if (showIslamic) {
-        buildIslamicLabels(iso).forEach((label) => {
-          lines.push(`<span class="calendar-meta-line ${label.italic ? 'islamic-note' : ''} ${label.important ? 'islamic-important' : ''}">${label.text}</span>`);
-        });
-      }
-      holidayPill.innerHTML = lines.join('');
-      holidayPill.classList.toggle('holiday-pill-long', Boolean(data.longWeekends.includes(iso)));
-      holidayPill.classList.toggle('has-content', lines.length > 0);
     });
-  }
-
-  function setupDaySelection() {
-    const inMonthCells = Array.from(document.querySelectorAll('.calendar-cell[data-in-month="true"]'));
-    if (!inMonthCells.length) return;
-
-    const firstOfMonth = inMonthCells.find((cell) => cell.dataset.date?.endsWith('-01')) || inMonthCells[0];
-    selectDayCell(firstOfMonth);
-
-    inMonthCells.forEach((cell) => {
-      cell.addEventListener('click', () => selectDayCell(cell));
-    });
-  }
-
-  function selectDayCell(targetCell) {
-    document.querySelectorAll('.calendar-cell.selected-day').forEach((cell) => {
-      cell.classList.remove('selected-day');
-      cell.setAttribute('aria-selected', 'false');
-    });
-    targetCell.classList.add('selected-day');
-    targetCell.setAttribute('aria-selected', 'true');
   }
 
   function setupPrintButtons() {
@@ -657,6 +614,13 @@ document.addEventListener('DOMContentLoaded', () => {
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.classList.remove('d-none');
+  }
+
+  function showMenuNearCell(menu, cell) {
+    const rect = cell.getBoundingClientRect();
+    const menuX = rect.left + window.scrollX + Math.min(rect.width - 36, 120);
+    const menuY = rect.top + window.scrollY + Math.min(rect.height - 36, 84);
+    showMenu(menu, menuX, menuY);
   }
 
   function hideMenus() {
