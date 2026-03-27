@@ -98,3 +98,4 @@ Then open http://127.0.0.1:5000/.
 - `docs/mycal-schema.md`
 - `docs/migration-notes.md`
 - `docs/qa-checklist.md`
+- `docs/interaction-improvements.md`
