@@ -105,11 +105,6 @@ export function renderCalendar({
   const hiddenHolidayDates = new Set(state.doc.settings?.hiddenMeta?.holidays || []);
   const hiddenIslamicDates = new Set(state.doc.settings?.hiddenMeta?.islamic || []);
   const holidays = state.doc.settings.showUSHolidays ? simpleUSHolidays(year, month) : new Map();
-  holidays.forEach((name, key) => {
-    if (hiddenHolidayDates.has(key)) return;
-    events[key] ||= [];
-    events[key].unshift({ isHoliday: true, displayText: name, color: '#7c3aed', title: name });
-  });
 
   monthGrid.innerHTML = '';
   monthGrid.setAttribute('role', 'grid');
@@ -262,7 +257,7 @@ export function renderCalendar({
         const lines = [];
         const holidayLabel = holidays.get(key);
         if (holidayLabel && !hiddenHolidayDates.has(key)) {
-          lines.push(`<span class="calendar-meta-line">${escapeHtml(holidayLabel)}</span>`);
+          lines.push(`<span class="calendar-meta-line us-holiday-note">${escapeHtml(holidayLabel)}</span>`);
         }
         if (state.doc.settings.showIslamicDates && !hiddenIslamicDates.has(key)) {
           buildIslamicLabels(key).forEach((label) => {

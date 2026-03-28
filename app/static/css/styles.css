@@ -270,6 +270,10 @@ body {
   text-overflow: ellipsis;
 }
 
+.us-holiday-note {
+  font-style: italic;
+}
+
 .events,
 .event-list {
   overflow-x: hidden;
