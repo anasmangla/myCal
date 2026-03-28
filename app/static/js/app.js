@@ -59,8 +59,15 @@ document.addEventListener('DOMContentLoaded', () => {
       activeDate = cell.dataset.date;
       showMenuNearCell(dateMenu, cell);
     });
-    cell.addEventListener('dblclick', () => {
+    cell.addEventListener('dblclick', async (event) => {
       activeDate = cell.dataset.date;
+      const eventChip = event.target.closest('.event-chip[data-source-event-id]');
+      if (eventChip) {
+        event.preventDefault();
+        event.stopPropagation();
+        await openEventById(Number(eventChip.dataset.sourceEventId));
+        return;
+      }
       openEventModal({ start_date: activeDate, end_date: activeDate });
     });
     cell.addEventListener('contextmenu', (event) => {
@@ -193,6 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.textContent = item.display_text;
         chip.style.backgroundColor = item.color;
         chip.href = '#';
+        if (item.source_event_id) {
+          chip.dataset.sourceEventId = String(item.source_event_id);
+        }
         chip.title = [item.title, item.location, item.notes].filter(Boolean).join(' • ');
         chip.draggable = Boolean(!item.is_holiday && item.source_event_id);
         chip.addEventListener('click', async (event) => {
