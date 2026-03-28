@@ -1,84 +1,70 @@
-# Code Review Recommendations (March 24, 2026)
+# Code Review Recommendations (March 28, 2026)
 
-This document summarizes practical improvements for maintainability, security, performance, and reliability across the current `myCal` codebase.
+This review focuses on practical improvements for reliability, security, and maintainability across the Flask backend and the modular static frontend.
 
 ## 1) Security and production hardening (highest priority)
 
-1. **Remove hardcoded development secret key defaults in runtime environments.**
-   - `SECRET_KEY='dev-secret-key'` is currently set directly in app config.
-   - Recommendation: load from environment (for example, `os.environ['SECRET_KEY']`) and fail fast when missing in non-dev mode.
+1. **Stop shipping with a default secret key in runtime config.**
+   - `app.config.from_mapping(...)` still sets `SECRET_KEY='dev-secret-key'` directly.
+   - Recommendation: read from environment by default, and fail fast for non-development deployments when missing.
 
-2. **Add CSRF protection for POST routes/forms.**
-   - The app has multiple POST endpoints for event create/update/delete/import and date-style updates.
-   - Recommendation: integrate Flask-WTF CSRF protection or a lightweight CSRF token middleware.
+2. **Add CSRF protection to all form-based POST routes.**
+   - Event save/delete/duplicate/move, import, and date-style updates are all state-changing POST operations.
+   - Recommendation: add Flask-WTF CSRF middleware (or equivalent token validation) and include tokens in forms/fetch requests.
 
-3. **Add upload limits and strict MIME/content validation for JSON import.**
-   - The import form supports JSON upload; enforce max payload size and robust parse/shape validation.
+3. **Enforce upload size limits for import.**
+   - JSON import currently reads uploaded files in-memory.
+   - Recommendation: add `MAX_CONTENT_LENGTH` and return clear user feedback when limits are exceeded.
 
-## 2) Database and data model improvements
+## 2) Data integrity and schema hygiene
 
-1. **Adopt Alembic/Flask-Migrate for schema evolution.**
-   - Current startup migration helper `_ensure_schema_updates()` only addresses one column and does not scale for future schema changes.
-   - Recommendation: move all schema changes into versioned migrations.
+1. **Move schema evolution from ad-hoc startup SQL to migrations.**
+   - `_ensure_schema_updates()` currently performs one-off `ALTER TABLE` checks at app startup.
+   - Recommendation: adopt Alembic/Flask-Migrate and version all schema changes.
 
-2. **Add uniqueness + integrity guards where applicable.**
-   - Candidate: `(event_id, day_offset)` in `EventDayLabel` should likely be unique.
-   - This avoids duplicate labels for the same day offset.
+2. **Guard day-label uniqueness by `(event_id, day_offset)`.**
+   - Duplicate day labels for the same offset are possible unless constrained.
+   - Recommendation: add a unique constraint at the database/model level.
 
-3. **Add database indexes for high-frequency filters.**
-   - Existing date indexes are good.
-   - Consider index support for recurrence fields if recurring event counts grow significantly.
+3. **Validate recurrence data more defensively during import.**
+   - Weekly recurrence should require weekdays and non-weekly recurrences should normalize weekday data.
+   - Recommendation: enforce invariant rules in import validators for consistency.
 
 ## 3) Flask/SQLAlchemy modernization
 
-1. **Replace legacy `Model.query.get()` usage with SQLAlchemy 2 style.**
-   - Recommendation: use `db.session.get(Event, event_id)` and explicit select constructs over legacy query APIs.
-   - This reduces deprecation risk and eases future upgrades.
+1. **Replace legacy query APIs with SQLAlchemy 2-style session access.**
+   - Several handlers use `Event.query.get(...)` / `get_or_404(...)` patterns.
+   - Recommendation: move to `db.session.get(...)` and explicit `select(...)` statements for forward compatibility.
 
-2. **Consolidate repeating return URL and form parsing logic.**
-   - Several routes repeat return-month argument handling.
-   - Recommendation: helper functions/decorators to standardize redirect/query parameter restoration and reduce drift.
+2. **Separate route handlers from mutation/business logic.**
+   - Route functions combine parsing, validation, persistence, and branching logic.
+   - Recommendation: extract service functions for save/move/delete/import paths to improve testability.
 
-## 4) Performance and UX
+## 4) Frontend robustness and UX
 
-1. **Avoid full page reloads for date-style changes.**
-   - Frontend currently reloads after changing/clearing date color.
-   - Recommendation: update the specific cell style in-place for a faster interaction.
+1. **Standardize async error handling for API calls.**
+   - API calls should consistently handle non-200 responses, parse failures, and offline conditions.
+   - Recommendation: centralize fetch wrappers and toast/error rendering behavior.
 
-2. **Reduce full-table date style load if data grows.**
-   - `load_date_styles()` fetches all rows globally.
-   - Recommendation: fetch styles for visible month range only.
+2. **Prefer targeted UI updates over full refresh flows.**
+   - Some interactions can be updated in-place to avoid page reload penalties.
+   - Recommendation: update specific calendar cells/sidepanel state after successful mutations where feasible.
 
-3. **Handle fetch/network failures consistently in JavaScript.**
-   - `fetch('/api/event/:id')` path should include non-200 checks and user feedback.
+## 5) Testing and release confidence
 
-## 5) Code quality and maintainability
+1. **Add backend tests for parser and recurrence edge cases.**
+   - Priority targets: `parse_event_form`, import validation, recurring deletion splits, and move semantics.
 
-1. **Create a shared domain layer for duplicated calendar logic.**
-   - `app/static/js/static-app.js` and backend calendar logic implement similar concepts separately.
-   - Recommendation: document intentional divergence, or generate static-mode structures from a common spec to avoid behavior drift.
+2. **Add route-level tests for critical workflows.**
+   - Save, delete (single vs all), move (occurrence vs whole series), import/export, and date-style endpoints.
 
-2. **Add automated tests and CI baseline.**
-   - Add unit tests for `event_utils.py` validators/parsers and recurrence expansion edge cases.
-   - Add route tests for save/delete/move/import/export flows.
-
-3. **Improve type strictness and static checks.**
-   - Add mypy/pyright configuration and run in CI for Python; keep ESLint/Prettier for JS.
-
-## 6) Portability and compatibility
-
-1. **Use platform-safe date formatting for week labels.**
-   - `strftime('%b %-d')` can break on Windows.
-   - Recommendation: use explicit formatting logic that does not rely on `%-d`.
-
-2. **Document timezone assumptions clearly.**
-   - JavaScript uses UTC in several helpers while backend uses date-only fields.
-   - Recommendation: add explicit policy in README (all-day/local vs UTC behavior).
+3. **Add CI baseline checks.**
+   - Recommendation: run Python lint + unit tests and a lightweight JavaScript lint/build check on every PR.
 
 ## Suggested implementation order
 
-1. Security hardening (`SECRET_KEY`, CSRF, upload limits).
-2. Migration setup with Alembic and model constraints.
-3. SQLAlchemy modernization (`db.session.get`, explicit selects).
-4. UX optimization (remove forced reloads on style updates).
-5. Test suite + CI pipeline.
+1. Secret key + CSRF + upload limit hardening.
+2. Migration framework + integrity constraints.
+3. Route/service refactor and SQLAlchemy 2-style query updates.
+4. Test coverage for recurrence/import flows.
+5. Frontend interaction polish and async error consistency.
