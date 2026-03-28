@@ -4,9 +4,7 @@
 @import url('./components/share-menu.css');
 
 :root {
-  --weekend-bg: #f1f3f5;
-  --holiday-bg: #fef3c7;
-  --long-weekend-bg: #e8edf3;
+  --weekend-color: #d9d9d9;
   --surface: #ffffff;
   --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   --sheet-width: 11in;
@@ -188,15 +186,15 @@ body {
 }
 
 .calendar-cell.weekend {
-  background: var(--weekend-bg);
+  background: var(--weekend-color);
 }
 
 .calendar-cell.holiday {
-  background: var(--holiday-bg);
+  background: var(--weekend-color);
 }
 
 .calendar-cell.long-weekend {
-  background: var(--long-weekend-bg);
+  background: var(--weekend-color);
 }
 
 .calendar-cell.outside-month {
