@@ -1,3 +1,8 @@
+@import url('./components/cell-editor.css');
+@import url('./components/attachments.css');
+@import url('./components/sidepanel.css');
+@import url('./components/share-menu.css');
+
 :root {
   --weekend-bg: #f1f3f5;
   --holiday-bg: #fef3c7;
@@ -10,11 +15,6 @@
   --sheet-header-height: 0.75in;
   --sheet-weekday-height: 0.32in;
 }
-
-@import url('./components/cell-editor.css');
-@import url('./components/attachments.css');
-@import url('./components/sidepanel.css');
-@import url('./components/share-menu.css');
 
 body {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
