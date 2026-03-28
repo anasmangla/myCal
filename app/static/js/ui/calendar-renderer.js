@@ -81,6 +81,7 @@ export function renderCalendar({
   onEventContext,
   onMoveEvent,
   onDropImage,
+  onRemoveImage,
 }) {
   if (!weekdayBuilt) {
     const weekdayHeader = document.getElementById('weekdayHeader');
@@ -123,6 +124,7 @@ export function renderCalendar({
       const cell = document.createElement('div');
       cell.className = `calendar-cell day-cell ${inMonth ? '' : 'outside-month'}`;
       cell.dataset.date = key;
+      cell.dataset.inMonth = inMonth ? 'true' : 'false';
       cell.tabIndex = inMonth ? 0 : -1;
       cell.setAttribute('role', 'gridcell');
       if (state.activeDate === key) cell.classList.add('selected-day');
@@ -173,6 +175,7 @@ export function renderCalendar({
               // Fall through to image drop handling.
             }
           }
+          onDropImage(key, event.dataTransfer?.files || []);
         });
       } else {
         cell.innerHTML = `
@@ -239,6 +242,11 @@ export function renderCalendar({
           img.src = att.thumbnailDataUrl;
           img.alt = att.altText || att.name || 'Cell image';
           img.className = index === 0 && !inMonth ? 'cell-thumb cell-thumb-primary' : 'cell-thumb';
+          img.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onRemoveImage({ date: key, attachmentId: attId });
+          });
           strip.appendChild(img);
         });
       }

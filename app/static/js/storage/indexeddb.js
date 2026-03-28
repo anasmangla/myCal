@@ -34,6 +34,16 @@ async function get(storeName, key) {
   });
 }
 
+async function remove(storeName, key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 async function getAll(storeName) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -48,6 +58,7 @@ export const saveDocument = (doc) => put(STORES.DOCUMENTS, doc);
 export const getDocument = (docId) => get(STORES.DOCUMENTS, docId);
 export const putAttachment = (key, dataUrl) => put(STORES.ATTACHMENTS, { key, dataUrl });
 export const getAttachment = async (key) => (await get(STORES.ATTACHMENTS, key))?.dataUrl || null;
+export const deleteAttachment = (key) => remove(STORES.ATTACHMENTS, key);
 
 export async function saveAutosave(entry) {
   const db = await openDb();
