@@ -1,7 +1,7 @@
 import { isImageFile, imageDimensions, fileToDataUrl } from '../utils/files.js';
 import { createAttachmentMeta } from '../models/attachment-model.js';
 import { ensureCell } from '../models/cell-model.js';
-import { putAttachment } from '../storage/indexeddb.js';
+import { putAttachment, deleteAttachment } from '../storage/indexeddb.js';
 
 function uuid() {
   return crypto.randomUUID ? crypto.randomUUID() : `att_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -24,6 +24,15 @@ export async function addImageToCell({ state, date, file }) {
   state.doc.attachments[id] = meta;
   const cell = ensureCell(state.doc, date);
   cell.attachments.push(id);
+}
+
+export async function removeImageFromCell({ state, date, attachmentId }) {
+  if (!date || !attachmentId) return;
+  const cell = state.doc.cells[date];
+  if (!cell?.attachments?.length) return;
+  cell.attachments = cell.attachments.filter((id) => id !== attachmentId);
+  delete state.doc.attachments[attachmentId];
+  await deleteAttachment(`attachment_${attachmentId}`);
 }
 
 export async function exportAttachmentsInline(doc) {

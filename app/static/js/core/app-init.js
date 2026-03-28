@@ -10,7 +10,7 @@ import { loadDocument, schedulePersist, persistDocument } from '../storage/persi
 import { migrateLegacyState } from './migration.js';
 import { openCellEditor, saveCellFromPanel } from '../features/cell-editor.js';
 import { setCellColor } from '../features/cell-colors.js';
-import { addImageToCell } from '../features/attachments.js';
+import { addImageToCell, removeImageFromCell } from '../features/attachments.js';
 import { exportDocumentJson, parseImportJson } from '../features/import-export.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
@@ -108,6 +108,13 @@ function rerender() {
       if (!file) return;
       try { await addImageToCell({ state: appState, date, file }); schedulePersist(appState.doc, 'attachment', setLastSaved); rerender(); }
       catch (error) { flash(error.message, 'danger'); }
+    },
+    onRemoveImage: async ({ date, attachmentId }) => {
+      const confirmed = window.confirm('Remove this image from the selected field?');
+      if (!confirmed) return;
+      await removeImageFromCell({ state: appState, date, attachmentId });
+      schedulePersist(appState.doc, 'attachment-remove', setLastSaved);
+      rerender();
     },
   });
   renderUnscheduled();
