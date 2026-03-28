@@ -236,6 +236,8 @@ async function loadOrCreateDoc(year, month) {
 }
 
 function bindMainUI() {
+  const dateColorPicker = document.getElementById('dateColorPicker');
+
   document.getElementById('calendarControls').addEventListener('submit', async (event) => {
     event.preventDefault();
     const [yearText, monthText] = document.getElementById('monthYearSelect').value.split('-');
@@ -402,6 +404,26 @@ function bindMainUI() {
     hideMenus();
     if (!activeDateContext) return;
     openEventModal({ startDate: activeDateContext, endDate: activeDateContext });
+  });
+  document.getElementById('contextChangeColor').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    const activeCell = appState.doc.cells[activeDateContext];
+    dateColorPicker.value = activeCell?.backgroundColor || '#fef3c7';
+    dateColorPicker.click();
+  });
+  document.getElementById('contextClearColor').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    setCellColor(appState.doc, activeDateContext, null);
+    schedulePersist(appState.doc, 'cell-color-clear', setLastSaved);
+    rerender();
+  });
+  dateColorPicker.addEventListener('input', (event) => {
+    if (!activeDateContext) return;
+    setCellColor(appState.doc, activeDateContext, event.target.value);
+    schedulePersist(appState.doc, 'cell-color', setLastSaved);
+    rerender();
   });
   document.getElementById('contextToggleHoliday').addEventListener('click', () => {
     hideMenus();
