@@ -87,11 +87,7 @@ function rerender() {
       rerender();
     },
     onOpenEvent: (payload) => openEventModal(payload),
-<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
     onOpenActions: (date) => openEventModal({ startDate: date, endDate: date }),
-=======
-    onOpenActions: (date) => { appState.activeDate = date; openCellEditor({ state: appState, date }); rerender(); },
->>>>>>> main
     onEditCellText: (date) => {
       appState.activeDate = date;
       openCellEditor({ state: appState, date });
@@ -319,22 +315,14 @@ function bindMainUI() {
   });
 
   document.getElementById('cellBgColor').addEventListener('input', (e) => {
-<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
     if (!appState.activeDate || !isOutsideVisibleMonth(appState.activeDate)) return;
-=======
-    if (!appState.activeDate) return;
->>>>>>> main
     const textColor = document.getElementById('cellTextColor').value;
     setCellColor(appState.doc, appState.activeDate, e.target.value, textColor);
     schedulePersist(appState.doc, 'cell-color', setLastSaved);
     rerender();
   });
   document.getElementById('cellTextColor').addEventListener('input', (e) => {
-<<<<<<< codex/add-image-upload-and-text-editing-features-7yw444
     if (!appState.activeDate || !isOutsideVisibleMonth(appState.activeDate)) return;
-=======
-    if (!appState.activeDate) return;
->>>>>>> main
     const activeCell = appState.doc.cells[appState.activeDate];
     if (!activeCell) return;
     activeCell.textColor = e.target.value || null;
