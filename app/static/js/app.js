@@ -98,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('contextAddEvent').addEventListener('click', () => {
     hideMenus();
+    if (!isSelectableDate(activeDate)) return;
     openEventModal({ start_date: activeDate, end_date: activeDate });
   });
 
@@ -458,6 +459,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', hideMenus);
   }
 
+
+  function isSelectableDate(isoDate) {
+    if (!isoDate) return false;
+    const cell = document.querySelector(`.calendar-cell[data-date="${isoDate}"]`);
+    return Boolean(cell && cell.dataset.inMonth === 'true');
+  }
+
   function setupFormBehavior() {
     const audienceField = document.getElementById('audience');
     const eventColorField = document.getElementById('eventColor');
@@ -494,6 +502,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function openEventModal(payload) {
+    const candidateStartDate = payload.start_date || payload.startDate || '';
+    if (candidateStartDate && !isSelectableDate(candidateStartDate)) {
+      showValidation('You can only add events on dates in the current month.');
+      return;
+    }
+
     eventForm.reset();
     validationEl.classList.add('d-none');
     document.getElementById('eventId').value = payload.id || '';
