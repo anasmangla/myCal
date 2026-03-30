@@ -242,16 +242,22 @@ async function loadOrCreateDoc(year, month) {
 
 function bindMainUI() {
   const dateColorPicker = document.getElementById('dateColorPicker');
+  const monthYearSelect = document.getElementById('monthYearSelect');
 
-  document.getElementById('calendarControls').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const [yearText, monthText] = document.getElementById('monthYearSelect').value.split('-');
+  const applySelectedMonth = async () => {
+    const [yearText, monthText] = monthYearSelect.value.split('-');
     appState.view.month = Number(monthText);
     appState.view.year = Number(yearText);
     appState.doc = await loadOrCreateDoc(appState.view.year, appState.view.month);
     saveActiveMonth(monthIso(appState.view.year, appState.view.month));
     rerender();
+  };
+
+  document.getElementById('calendarControls').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await applySelectedMonth();
   });
+  monthYearSelect.addEventListener('change', applySelectedMonth);
 
   document.getElementById('eventForm').addEventListener('submit', async (event) => {
     event.preventDefault();

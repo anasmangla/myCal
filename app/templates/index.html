@@ -6,7 +6,7 @@
     <div>
       <h1 class="h3 mb-1">myCal Monthly Planner</h1>
     </div>
-    <form class="row g-2 align-items-center" method="get">
+    <form class="row g-2 align-items-center" method="get" id="calendarMonthForm">
       <div class="col-auto">
         <select class="form-select" name="month_year" aria-label="Month and year">
           {% for option in month_year_options %}
@@ -24,7 +24,6 @@
         <input class="form-check-input" type="checkbox" role="switch" id="holidaysToggle" name="holidays" value="1" {% if include_holidays %}checked{% endif %}>
         <label class="form-check-label" for="holidaysToggle">U.S. holidays</label>
       </div>
-      <div class="col-auto"><button class="btn btn-primary">Go</button></div>
     </form>
   </div>
   <div class="toolbar-panel no-print mb-3">
@@ -209,4 +208,12 @@
   <input type="file" name="calendar_file" id="importDataFileInput" accept=".json,application/json">
 </form>
 <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('calendarMonthForm');
+    const monthSelect = form?.querySelector('select[name="month_year"]');
+    if (!form || !monthSelect) return;
+    monthSelect.addEventListener('change', () => form.submit());
+  });
+</script>
 {% endblock %}
