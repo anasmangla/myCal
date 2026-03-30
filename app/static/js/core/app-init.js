@@ -143,14 +143,19 @@ function setHiddenDateSet(type, values) {
 }
 
 function updateDateContextLabels(date) {
+  const addEventBtn = document.getElementById('contextAddEvent');
   const holidayBtn = document.getElementById('contextToggleHoliday');
   const islamicBtn = document.getElementById('contextToggleIslamic');
+  const inVisibleMonth = !isOutsideVisibleMonth(date);
   const holidayHidden = hiddenDateSet('holidays').has(date);
   const islamicHidden = hiddenDateSet('islamic').has(date);
+  addEventBtn.classList.toggle('d-none', !inVisibleMonth);
+  holidayBtn.classList.toggle('d-none', !inVisibleMonth);
+  islamicBtn.classList.toggle('d-none', !inVisibleMonth);
   holidayBtn.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
   islamicBtn.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
-  holidayBtn.disabled = !appState.doc.settings.showUSHolidays;
-  islamicBtn.disabled = !appState.doc.settings.showIslamicDates;
+  holidayBtn.disabled = !inVisibleMonth || !appState.doc.settings.showUSHolidays;
+  islamicBtn.disabled = !inVisibleMonth || !appState.doc.settings.showIslamicDates;
 }
 
 function toggleHiddenDate(type, date) {
