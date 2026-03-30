@@ -42,8 +42,19 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFormBehavior();
   setupEventDragAndDrop();
 
+  function clearSelectedEvent() {
+    activeEventId = null;
+    activeEventOccurrenceDate = null;
+  }
+
+  function selectEvent(eventId, occurrenceDate) {
+    activeEventId = eventId;
+    activeEventOccurrenceDate = occurrenceDate;
+  }
+
   document.querySelectorAll('.date-action-btn').forEach((button) => {
     button.addEventListener('click', () => {
+      clearSelectedEvent();
       openEventModal({ start_date: button.dataset.dateAction, end_date: button.dataset.dateAction });
     });
     button.addEventListener('contextmenu', (event) => {
@@ -57,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cell.title = 'Left click: options • Right click: options • Double click: add event';
     cell.addEventListener('click', () => {
       activeDate = cell.dataset.date;
+      if (!cell.querySelector('.event-chip:hover')) clearSelectedEvent();
       showMenuNearCell(dateMenu, cell);
     });
     cell.addEventListener('dblclick', async (event) => {
@@ -65,7 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (eventChip) {
         event.preventDefault();
         event.stopPropagation();
-        await openEventById(Number(eventChip.dataset.sourceEventId));
+        const sourceEventId = Number(eventChip.dataset.sourceEventId);
+        selectEvent(sourceEventId, activeDate);
+        await openEventById(sourceEventId);
+        return;
+      }
+      if (activeEventId && activeEventOccurrenceDate === activeDate) {
+        event.preventDefault();
+        await openEventById(activeEventId);
         return;
       }
       openEventModal({ start_date: activeDate, end_date: activeDate });
@@ -207,26 +226,27 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.draggable = Boolean(!item.is_holiday && item.source_event_id);
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
+          event.stopPropagation();
           if (item.is_holiday || !item.source_event_id) return;
+          selectEvent(item.source_event_id, date);
           await openEventById(item.source_event_id);
         });
         chip.addEventListener('dblclick', async (event) => {
           event.preventDefault();
           event.stopPropagation();
           if (item.is_holiday || !item.source_event_id) return;
+          selectEvent(item.source_event_id, date);
           await openEventById(item.source_event_id);
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           if (item.is_holiday || !item.source_event_id) return;
-          activeEventId = item.source_event_id;
-          activeEventOccurrenceDate = date;
+          selectEvent(item.source_event_id, date);
           showMenu(eventMenu, event.pageX, event.pageY);
         });
         chip.addEventListener('dragstart', (event) => {
           if (item.is_holiday || !item.source_event_id) return;
-          activeEventId = item.source_event_id;
-          activeEventOccurrenceDate = date;
+          selectEvent(item.source_event_id, date);
           event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.source_event_id, anchorDate: date }));
           event.dataTransfer.effectAllowed = 'move';
           chip.classList.add('is-dragging');
