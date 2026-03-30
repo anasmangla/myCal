@@ -785,15 +785,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function syncDateMenuLabels() {
+    const addEventButton = document.getElementById('contextAddEvent');
     const holidayButton = document.getElementById('contextToggleHoliday');
     const islamicButton = document.getElementById('contextToggleIslamic');
+    const selectableDate = isSelectableDate(activeDate);
     const hasHoliday = Boolean(activeDate && data.holidays[activeDate]);
-    const hasIslamic = Boolean(activeDate && data.includeIslamic);
+    const hasIslamic = Boolean(selectableDate && data.includeIslamic);
     const holidayHidden = Boolean(activeDate && isHiddenMeta('holidays', activeDate));
     const islamicHidden = Boolean(activeDate && isHiddenMeta('islamic', activeDate));
 
-    holidayButton.disabled = !hasHoliday;
-    islamicButton.disabled = !hasIslamic;
+    addEventButton.classList.toggle('d-none', !selectableDate);
+    holidayButton.classList.toggle('d-none', !selectableDate);
+    islamicButton.classList.toggle('d-none', !selectableDate);
+    holidayButton.disabled = !selectableDate || !hasHoliday;
+    islamicButton.disabled = !selectableDate || !hasIslamic;
     holidayButton.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
     islamicButton.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
   }
