@@ -145,7 +145,11 @@ export function renderCalendar({
         `;
 
         cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: true }));
-        cell.addEventListener('dblclick', () => onEditCellText(key));
+        cell.addEventListener('dblclick', (event) => {
+          const eventChip = event.target.closest('.event-chip');
+          if (eventChip) return;
+          onOpenActions(key);
+        });
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
@@ -213,6 +217,11 @@ export function renderCalendar({
         chip.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (item.sourceEventId) onOpenEvent(item.sourceEventId);
+        });
+        chip.addEventListener('dblclick', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           if (item.sourceEventId) onOpenEvent(item.sourceEventId);
         });
         chip.addEventListener('contextmenu', (event) => {
