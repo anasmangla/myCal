@@ -93,6 +93,19 @@ def _add_months(value: date, delta_months: int) -> date:
     return date(year, month_index + 1, 1)
 
 
+def _return_month_bounds() -> tuple[date, date] | None:
+    try:
+        year = int((request.form.get('return_year') or '').strip())
+        month = int((request.form.get('return_month') or '').strip())
+        month_start = date(year, month, 1)
+    except (TypeError, ValueError):
+        return None
+
+    next_month = _add_months(month_start, 1)
+    month_end = next_month - timedelta(days=1)
+    return month_start, month_end
+
+
 @bp.get('/api/event/<int:event_id>')
 def get_event(event_id: int):
     event = Event.query.get_or_404(event_id)
@@ -122,6 +135,12 @@ def save_event():
     form = request.form
     try:
         payload = parse_event_form(form)
+        month_bounds = _return_month_bounds()
+        if month_bounds is not None:
+            month_start, month_end = month_bounds
+            if payload.start_date < month_start or payload.end_date > month_end:
+                raise ValidationError('You can only add events on dates in the current month.')
+
         event = Event.query.get(payload.event_id) if payload.event_id else Event()
         if payload.event_id and event is None:
             raise ValidationError('The event you tried to edit no longer exists.')
