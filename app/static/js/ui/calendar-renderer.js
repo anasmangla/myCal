@@ -88,7 +88,7 @@ export function renderCalendar({
     WEEKDAY_NAMES.forEach((name) => {
       const cell = document.createElement('div');
       cell.className = 'weekday-cell';
-      cell.textContent = name;
+      cell.textContent = name.slice(0, 3).toUpperCase();
       weekdayHeader.appendChild(cell);
     });
     weekdayBuilt = true;
