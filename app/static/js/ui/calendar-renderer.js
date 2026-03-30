@@ -122,6 +122,10 @@ export function renderCalendar({
       cell.dataset.inMonth = inMonth ? 'true' : 'false';
       cell.tabIndex = inMonth ? 0 : -1;
       cell.setAttribute('role', 'gridcell');
+      const isWeekend = day.getUTCDay() === 0 || day.getUTCDay() === 6;
+      const isHoliday = holidays.has(key) && !hiddenHolidayDates.has(key);
+      if (inMonth && isWeekend) cell.classList.add('weekend');
+      if (inMonth && isHoliday) cell.classList.add('holiday');
       if (state.activeDate === key) cell.classList.add('selected-day');
       if (cellData?.backgroundColor) {
         cell.style.backgroundColor = cellData.backgroundColor;
@@ -182,6 +186,10 @@ export function renderCalendar({
         cell.tabIndex = 0;
         cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: false }));
         cell.addEventListener('dblclick', () => onEditCellText(key));
+        cell.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          onDateContext({ date: key, x: event.pageX, y: event.pageY });
+        });
         cell.addEventListener('dragover', (event) => {
           event.preventDefault();
           cell.classList.add('drop-target');
