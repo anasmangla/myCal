@@ -492,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('endDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
 
     syncRecurringEndDate();
+    toggleWeeklyOptions();
     eventForm.addEventListener('submit', (event) => {
       const error = validateEventForm();
       if (error) {
@@ -613,7 +614,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function toggleWeeklyOptions() {
     const isWeekly = document.getElementById('recurrenceType').value === 'weekly';
-    document.getElementById('weeklyOptions').style.display = isWeekly ? 'block' : 'none';
+    const weeklyOptions = document.getElementById('weeklyOptions');
+    weeklyOptions.classList.toggle('d-none', !isWeekly);
     document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
       checkbox.disabled = !isWeekly;
       if (!isWeekly) checkbox.checked = false;
