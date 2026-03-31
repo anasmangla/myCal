@@ -43,7 +43,7 @@ body {
 }
 
 .action-bar {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .action-bar .btn {
