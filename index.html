@@ -33,6 +33,37 @@
       <div class="toolbar-panel no-print mb-3">
         <div class="d-flex align-items-center justify-content-start">
           <div class="d-flex gap-2 action-bar">
+            <div class="dropdown">
+              <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" id="colorSettingsToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i class="bi bi-palette me-1" aria-hidden="true"></i>Colors
+              </button>
+              <div class="dropdown-menu p-3 color-settings-menu" aria-labelledby="colorSettingsToggle">
+                <div class="mb-2 fw-semibold small text-uppercase text-muted">Calendar colors</div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="nonDateColorInput">Non-dates color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="nonDateColorInput" value="#f5f5f5">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="weekendHolidayColorInput">Weekend/holiday color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="weekendHolidayColorInput" value="#d9d9d9">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="weekdayColorInput">Weekdays header color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="weekdayColorInput" value="#0f172a">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="lineColorInput">Lines color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="lineColorInput" value="#d6deea">
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1 d-flex justify-content-between" for="lineThicknessInput">
+                    <span>Line thickness</span><span id="lineThicknessValue">1px</span>
+                  </label>
+                  <input type="range" class="form-range" id="lineThicknessInput" min="1" max="4" step="0.5" value="1">
+                </div>
+                <button type="button" class="btn btn-link btn-sm p-0" id="resetColorSettingsBtn">Reset defaults</button>
+              </div>
+            </div>
             <button class="btn btn-outline-primary btn-sm" type="button" id="printBtn">
               <i class="bi bi-printer me-1" aria-hidden="true"></i>Print / Save PDF
             </button>

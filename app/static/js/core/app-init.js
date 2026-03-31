@@ -19,6 +19,13 @@ import { searchDocument } from '../features/search.js';
 let eventModal;
 let activeDateContext = '';
 let activeEventContext = { eventId: '', occurrenceDate: '' };
+const defaultThemeSettings = {
+  outsideMonthColor: '#f5f5f5',
+  weekendHolidayColor: '#d9d9d9',
+  weekdayHeaderColor: '#0f172a',
+  lineColor: '#d6deea',
+  lineThickness: 1,
+};
 
 function uuid() {
   return crypto.randomUUID ? crypto.randomUUID() : `doc_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -118,6 +125,60 @@ function rerender() {
     },
   });
   renderUnscheduled();
+}
+
+function getThemeSettings() {
+  const existing = appState.doc.settings?.theme || {};
+  return { ...defaultThemeSettings, ...existing };
+}
+
+function applyThemeSettings() {
+  const theme = getThemeSettings();
+  const root = document.documentElement;
+  root.style.setProperty('--outside-month-color', theme.outsideMonthColor);
+  root.style.setProperty('--weekend-color', theme.weekendHolidayColor);
+  root.style.setProperty('--weekday-header-color', theme.weekdayHeaderColor);
+  root.style.setProperty('--grid-line-color', theme.lineColor);
+  root.style.setProperty('--grid-line-width', `${theme.lineThickness}px`);
+}
+
+function bindThemeControls() {
+  const nonDateColorInput = document.getElementById('nonDateColorInput');
+  const weekendHolidayColorInput = document.getElementById('weekendHolidayColorInput');
+  const weekdayColorInput = document.getElementById('weekdayColorInput');
+  const lineColorInput = document.getElementById('lineColorInput');
+  const lineThicknessInput = document.getElementById('lineThicknessInput');
+  const lineThicknessValue = document.getElementById('lineThicknessValue');
+  const resetColorSettingsBtn = document.getElementById('resetColorSettingsBtn');
+
+  if (!nonDateColorInput) return;
+
+  const syncControls = () => {
+    const theme = getThemeSettings();
+    nonDateColorInput.value = theme.outsideMonthColor;
+    weekendHolidayColorInput.value = theme.weekendHolidayColor;
+    weekdayColorInput.value = theme.weekdayHeaderColor;
+    lineColorInput.value = theme.lineColor;
+    lineThicknessInput.value = String(theme.lineThickness);
+    lineThicknessValue.textContent = `${theme.lineThickness}px`;
+  };
+
+  const updateTheme = (patch) => {
+    appState.doc.settings.theme = { ...getThemeSettings(), ...patch };
+    applyThemeSettings();
+    syncControls();
+    schedulePersist(appState.doc, 'theme', setLastSaved);
+    rerender();
+  };
+
+  nonDateColorInput.addEventListener('input', () => updateTheme({ outsideMonthColor: nonDateColorInput.value }));
+  weekendHolidayColorInput.addEventListener('input', () => updateTheme({ weekendHolidayColor: weekendHolidayColorInput.value }));
+  weekdayColorInput.addEventListener('input', () => updateTheme({ weekdayHeaderColor: weekdayColorInput.value }));
+  lineColorInput.addEventListener('input', () => updateTheme({ lineColor: lineColorInput.value }));
+  lineThicknessInput.addEventListener('input', () => updateTheme({ lineThickness: Number(lineThicknessInput.value) }));
+  resetColorSettingsBtn.addEventListener('click', () => updateTheme({ ...defaultThemeSettings }));
+
+  syncControls();
 }
 
 function showMenu(menu, x, y) {
@@ -487,8 +548,11 @@ export async function initStaticApp() {
     : defaults;
 
   appState.doc = await loadOrCreateDoc(appState.view.year, appState.view.month);
+  appState.doc.settings.theme = { ...defaultThemeSettings, ...(appState.doc.settings.theme || {}) };
+  applyThemeSettings();
   eventModal = new bootstrap.Modal(document.getElementById('eventModal'));
   bindMainUI();
+  bindThemeControls();
   setLastSaved(getMeta().lastSavedAt || null);
   rerender();
 }

@@ -26,11 +26,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventActionAnchorDate = document.getElementById('eventActionAnchorDate');
   const titleDisplay = document.getElementById('calendarTitleDisplay');
   const titleInput = document.getElementById('calendarTitleInput');
+  const nonDateColorInput = document.getElementById('nonDateColorInput');
+  const weekendHolidayColorInput = document.getElementById('weekendHolidayColorInput');
+  const weekdayColorInput = document.getElementById('weekdayColorInput');
+  const lineColorInput = document.getElementById('lineColorInput');
+  const lineThicknessInput = document.getElementById('lineThicknessInput');
+  const lineThicknessValue = document.getElementById('lineThicknessValue');
+  const resetColorSettingsBtn = document.getElementById('resetColorSettingsBtn');
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
   const hiddenMeta = loadHiddenMeta();
+  const defaultThemeSettings = {
+    outsideMonthColor: '#f5f5f5',
+    weekendHolidayColor: '#d9d9d9',
+    weekdayHeaderColor: '#0f172a',
+    lineColor: '#d6deea',
+    lineThickness: 1,
+  };
+  let themeSettings = loadThemeSettings();
 
+  applyThemeSettings();
+  setupColorSettings();
   applyDateStyles();
   renderEvents();
   setupCalendarTitle();
@@ -347,6 +364,82 @@ document.addEventListener('DOMContentLoaded', () => {
         holidayPill.innerHTML = '';
         holidayPill.classList.remove('holiday-pill-long', 'has-content');
       }
+    });
+  }
+
+  function themeSettingsStorageKey() {
+    return 'mycal.theme.settings.v1';
+  }
+
+  function loadThemeSettings() {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(themeSettingsStorageKey()) || '{}');
+      return { ...defaultThemeSettings, ...parsed };
+    } catch (error) {
+      return { ...defaultThemeSettings };
+    }
+  }
+
+  function saveThemeSettings() {
+    window.localStorage.setItem(themeSettingsStorageKey(), JSON.stringify(themeSettings));
+  }
+
+  function applyThemeSettings() {
+    const root = document.documentElement;
+    root.style.setProperty('--outside-month-color', themeSettings.outsideMonthColor);
+    root.style.setProperty('--weekend-color', themeSettings.weekendHolidayColor);
+    root.style.setProperty('--weekday-header-color', themeSettings.weekdayHeaderColor);
+    root.style.setProperty('--grid-line-color', themeSettings.lineColor);
+    root.style.setProperty('--grid-line-width', `${themeSettings.lineThickness}px`);
+  }
+
+  function setupColorSettings() {
+    if (!nonDateColorInput) return;
+
+    nonDateColorInput.value = themeSettings.outsideMonthColor;
+    weekendHolidayColorInput.value = themeSettings.weekendHolidayColor;
+    weekdayColorInput.value = themeSettings.weekdayHeaderColor;
+    lineColorInput.value = themeSettings.lineColor;
+    lineThicknessInput.value = String(themeSettings.lineThickness);
+    lineThicknessValue.textContent = `${themeSettings.lineThickness}px`;
+
+    nonDateColorInput.addEventListener('input', () => {
+      themeSettings.outsideMonthColor = nonDateColorInput.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    weekendHolidayColorInput.addEventListener('input', () => {
+      themeSettings.weekendHolidayColor = weekendHolidayColorInput.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    weekdayColorInput.addEventListener('input', () => {
+      themeSettings.weekdayHeaderColor = weekdayColorInput.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    lineColorInput.addEventListener('input', () => {
+      themeSettings.lineColor = lineColorInput.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    lineThicknessInput.addEventListener('input', () => {
+      themeSettings.lineThickness = Number(lineThicknessInput.value);
+      lineThicknessValue.textContent = `${themeSettings.lineThickness}px`;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+
+    resetColorSettingsBtn.addEventListener('click', () => {
+      themeSettings = { ...defaultThemeSettings };
+      applyThemeSettings();
+      nonDateColorInput.value = themeSettings.outsideMonthColor;
+      weekendHolidayColorInput.value = themeSettings.weekendHolidayColor;
+      weekdayColorInput.value = themeSettings.weekdayHeaderColor;
+      lineColorInput.value = themeSettings.lineColor;
+      lineThicknessInput.value = String(themeSettings.lineThickness);
+      lineThicknessValue.textContent = `${themeSettings.lineThickness}px`;
+      saveThemeSettings();
     });
   }
 
