@@ -597,8 +597,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openEventModal(payload) {
     const candidateStartDate = payload.start_date || payload.startDate || '';
-    if (candidateStartDate && !isSelectableDate(candidateStartDate)) {
-      showValidation('You can only add events on dates in the current month.');
+    const candidateEndDate = payload.end_date || payload.endDate || candidateStartDate;
+    if (
+      (candidateStartDate && !isSelectableDate(candidateStartDate))
+      || (candidateEndDate && !isSelectableDate(candidateEndDate))
+    ) {
+      showValidation('Event dates for add/edit must stay within the current month.');
       return;
     }
 
