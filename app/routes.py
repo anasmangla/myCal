@@ -55,6 +55,8 @@ def index():
         islamic_mode = 'partial'
     include_islamic = islamic_mode != 'off'
     context = month_context(year, month, include_holidays)
+    selected_month_start = date(year, month, 1)
+    selected_month_end = _add_months(selected_month_start, 1) - timedelta(days=1)
     month_year_options = []
     cursor = min_month
     while cursor <= max_month:
@@ -70,6 +72,8 @@ def index():
         'index.html',
         selected_year=year,
         selected_month=month,
+        selected_month_start=selected_month_start.isoformat(),
+        selected_month_end=selected_month_end.isoformat(),
         selected_month_year=f'{selected_month_date.year}-{selected_month_date.month:02d}',
         month_year_options=month_year_options,
         month_names=MONTH_NAMES,
@@ -143,7 +147,7 @@ def save_event():
         if month_bounds is not None:
             month_start, month_end = month_bounds
             if payload.start_date < month_start or payload.end_date > month_end:
-                raise ValidationError('You can only add events on dates in the current month.')
+                raise ValidationError('Event dates for add/edit must stay within the current month.')
 
         event = Event.query.get(payload.event_id) if payload.event_id else Event()
         if payload.event_id and event is None:
