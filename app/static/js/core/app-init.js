@@ -28,6 +28,7 @@ const FONT_PRESETS = {
   palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
   verdana: 'Verdana, Geneva, sans-serif',
 };
+const LEGACY_REM_TO_PT = 12;
 const defaultThemeSettings = {
   outsideMonthColor: '#f5f5f5',
   weekendHolidayColor: '#d9d9d9',
@@ -36,9 +37,9 @@ const defaultThemeSettings = {
   lineThickness: 1,
   bodyFontPreset: 'system',
   titleFontPreset: 'system',
-  bodyFontSize: 0.95,
-  titleFontSize: 1.15,
-  eventFontSize: 0.62,
+  bodyFontSize: 11,
+  titleFontSize: 14,
+  eventFontSize: 8,
 };
 
 function fontStackForPreset(preset) {
@@ -50,23 +51,35 @@ function themeNumber(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function formatRemValue(value) {
-  return `${themeNumber(value, 0).toFixed(2)}rem`;
+function normalizeFontPointValue(value, fallback) {
+  const parsed = themeNumber(value, fallback);
+  if (parsed > 0 && parsed <= 2.5) {
+    return Number((Math.round(parsed * LEGACY_REM_TO_PT * 2) / 2).toFixed(1));
+  }
+  return parsed;
+}
+
+function formatPointCssValue(value) {
+  return `${normalizeFontPointValue(value, 0)}pt`;
+}
+
+function formatFontControlValue(value) {
+  return String(Number(normalizeFontPointValue(value, 0).toFixed(1)));
 }
 
 function derivedThemeSizes(theme) {
-  const bodyFontSize = themeNumber(theme.bodyFontSize, defaultThemeSettings.bodyFontSize);
-  const titleFontSize = themeNumber(theme.titleFontSize, defaultThemeSettings.titleFontSize);
-  const eventFontSize = themeNumber(theme.eventFontSize, defaultThemeSettings.eventFontSize);
+  const bodyFontSize = normalizeFontPointValue(theme.bodyFontSize, defaultThemeSettings.bodyFontSize);
+  const titleFontSize = normalizeFontPointValue(theme.titleFontSize, defaultThemeSettings.titleFontSize);
+  const eventFontSize = normalizeFontPointValue(theme.eventFontSize, defaultThemeSettings.eventFontSize);
 
   return {
     bodyFontSize,
     titleFontSize,
     eventFontSize,
-    weekdayFontSize: Math.max(0.72, Number((bodyFontSize - 0.13).toFixed(2))),
-    dayNumberFontSize: Math.max(0.82, Number((bodyFontSize - 0.05).toFixed(2))),
-    metaFontSize: Math.max(0.54, Number((bodyFontSize - 0.36).toFixed(2))),
-    noteFontSize: Math.max(0.56, Number((bodyFontSize - 0.35).toFixed(2))),
+    weekdayFontSize: Math.max(8.6, Number((bodyFontSize - 1.6).toFixed(1))),
+    dayNumberFontSize: Math.max(9.8, Number((bodyFontSize - 0.6).toFixed(1))),
+    metaFontSize: Math.max(6.5, Number((bodyFontSize - 4.3).toFixed(1))),
+    noteFontSize: Math.max(6.7, Number((bodyFontSize - 4.2).toFixed(1))),
   };
 }
 
@@ -256,7 +269,13 @@ function rerender() {
 
 function getThemeSettings() {
   const existing = appState.doc.settings?.theme || {};
-  return { ...defaultThemeSettings, ...existing };
+  return {
+    ...defaultThemeSettings,
+    ...existing,
+    bodyFontSize: normalizeFontPointValue(existing.bodyFontSize, defaultThemeSettings.bodyFontSize),
+    titleFontSize: normalizeFontPointValue(existing.titleFontSize, defaultThemeSettings.titleFontSize),
+    eventFontSize: normalizeFontPointValue(existing.eventFontSize, defaultThemeSettings.eventFontSize),
+  };
 }
 
 function applyThemeSettings() {
@@ -270,13 +289,13 @@ function applyThemeSettings() {
   root.style.setProperty('--grid-line-width', `${theme.lineThickness}px`);
   root.style.setProperty('--calendar-font-family', fontStackForPreset(theme.bodyFontPreset));
   root.style.setProperty('--calendar-title-font-family', fontStackForPreset(theme.titleFontPreset));
-  root.style.setProperty('--calendar-body-font-size', formatRemValue(sizes.bodyFontSize));
-  root.style.setProperty('--calendar-title-font-size', formatRemValue(sizes.titleFontSize));
-  root.style.setProperty('--calendar-weekday-font-size', formatRemValue(sizes.weekdayFontSize));
-  root.style.setProperty('--calendar-day-number-font-size', formatRemValue(sizes.dayNumberFontSize));
-  root.style.setProperty('--calendar-meta-font-size', formatRemValue(sizes.metaFontSize));
-  root.style.setProperty('--calendar-event-font-size', formatRemValue(sizes.eventFontSize));
-  root.style.setProperty('--calendar-note-font-size', formatRemValue(sizes.noteFontSize));
+  root.style.setProperty('--calendar-body-font-size', formatPointCssValue(sizes.bodyFontSize));
+  root.style.setProperty('--calendar-title-font-size', formatPointCssValue(sizes.titleFontSize));
+  root.style.setProperty('--calendar-weekday-font-size', formatPointCssValue(sizes.weekdayFontSize));
+  root.style.setProperty('--calendar-day-number-font-size', formatPointCssValue(sizes.dayNumberFontSize));
+  root.style.setProperty('--calendar-meta-font-size', formatPointCssValue(sizes.metaFontSize));
+  root.style.setProperty('--calendar-event-font-size', formatPointCssValue(sizes.eventFontSize));
+  root.style.setProperty('--calendar-note-font-size', formatPointCssValue(sizes.noteFontSize));
 }
 
 function bindThemeControls() {
@@ -309,11 +328,11 @@ function bindThemeControls() {
     bodyFontPresetSelect.value = theme.bodyFontPreset;
     titleFontPresetSelect.value = theme.titleFontPreset;
     bodyFontSizeInput.value = String(theme.bodyFontSize);
-    bodyFontSizeValue.textContent = formatRemValue(theme.bodyFontSize);
+    bodyFontSizeValue.textContent = formatFontControlValue(theme.bodyFontSize);
     titleFontSizeInput.value = String(theme.titleFontSize);
-    titleFontSizeValue.textContent = formatRemValue(theme.titleFontSize);
+    titleFontSizeValue.textContent = formatFontControlValue(theme.titleFontSize);
     eventFontSizeInput.value = String(theme.eventFontSize);
-    eventFontSizeValue.textContent = formatRemValue(theme.eventFontSize);
+    eventFontSizeValue.textContent = formatFontControlValue(theme.eventFontSize);
   };
 
   const updateTheme = (patch) => {
