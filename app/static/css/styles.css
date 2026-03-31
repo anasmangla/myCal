@@ -233,6 +233,13 @@ body {
   flex: 0 0 auto;
 }
 
+.audience-color-input {
+  inline-size: 2.2rem;
+  block-size: 1.6rem;
+  padding: 0.1rem;
+  border: 0;
+}
+
 .date-action-btn.btn.btn-sm {
   --bs-btn-padding-y: 0.05rem;
   --bs-btn-padding-x: 0.25rem;

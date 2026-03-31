@@ -8,6 +8,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 
 from . import db
 from .calendar_utils import (
+    AUDIENCE_COLORS,
     AUDIENCE_CHOICES,
     MONTH_NAMES,
     RECURRENCE_CHOICES,
@@ -81,6 +82,7 @@ def index():
         islamic_mode=islamic_mode,
         include_islamic=include_islamic,
         audience_choices=AUDIENCE_CHOICES,
+        audience_default_colors=AUDIENCE_COLORS,
         recurrence_choices=RECURRENCE_CHOICES,
         weekday_choices=WEEKDAY_CHOICES,
         event_json=json.dumps(context['occurrences']),

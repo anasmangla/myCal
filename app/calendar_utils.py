@@ -16,6 +16,7 @@ AUDIENCE_COLORS = {
     'Khuddam': '#1f3a5f',
     'Atfal': '#75b8ff',
     'Tahir Academy': '#2f855a',
+    'Waqf-e-Nau': '#7c3aed',
     'All': '#1f2937',
     'Unspecified': '#4b5563',
 }
@@ -28,6 +29,7 @@ AUDIENCE_CHOICES = [
     'Nasirat',
     'Lajna',
     'Tahir Academy',
+    'Waqf-e-Nau',
     'Unspecified',
 ]
 
@@ -62,6 +64,7 @@ class Occurrence:
     location: str | None
     notes: str | None
     is_holiday: bool = False
+    uses_custom_color: bool = False
 
 
 @dataclass
@@ -151,6 +154,7 @@ def build_occurrence(event: Event, current_day: date, label: str) -> Occurrence:
         color=occurrence_color(event.audience, event.color),
         location=event.location,
         notes=event.notes,
+        uses_custom_color=bool(event.color),
     )
 
 
@@ -241,6 +245,7 @@ def serialize_occurrence(item: Occurrence) -> dict:
         'location': item.location,
         'notes': item.notes,
         'is_holiday': item.is_holiday,
+        'uses_custom_color': item.uses_custom_color,
     }
 
 
