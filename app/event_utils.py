@@ -101,9 +101,9 @@ def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
     title = (form.get('title') or '').strip()
     start_date = parse_iso_date(form.get('start_date'), 'Start date')
     end_date = parse_iso_date(form.get('end_date'), 'End date')
-    recurrence_type = (form.get('recurrence_type') or 'none').strip().lower()
     all_day = form.get('all_day') == 'on'
     selected_weekdays = [item for item in form.getlist('recurrence_weekdays') if item in VALID_WEEKDAY_VALUES]
+    recurrence_type = 'weekly' if selected_weekdays else (form.get('recurrence_type') or 'none').strip().lower()
 
     payload = EventPayload(
         event_id=form.get('event_id', type=int),
@@ -171,8 +171,6 @@ def validate_event_payload(payload: EventPayload, month_scope: EventMonthScope, 
             raise ValidationError('Choose at least one weekday for a weekly recurring event.')
         if not payload.recurrence_weekdays:
             raise ValidationError('One or more selected recurrence weekdays were invalid.')
-    elif raw_weekday_count:
-        raise ValidationError('Weekly recurrence weekdays can only be used with weekly recurring events.')
 
     for offset in payload.labels:
         if offset >= span_days:
