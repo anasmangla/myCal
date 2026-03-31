@@ -377,8 +377,8 @@ body {
   line-height: 1.1;
   color: #6b7280;
   margin-bottom: 0.15rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 100%;
+  overflow: visible;
 }
 
 .holiday-pill:empty {
@@ -398,9 +398,10 @@ body {
 
 .calendar-meta-line {
   display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .us-holiday-note {
