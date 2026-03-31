@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const data = window.CALENDAR_DATA;
-  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-tbla', { month: 'long', day: 'numeric', timeZone: 'UTC' });
   const islamicMonthNameMap = {
     Muharram: 'Muharram',
     Safar: 'Safar',
@@ -15,16 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     "Dhuʻl-Qiʻdah": "Dhul Qi'dah",
     "Dhuʻl-Hijjah": 'Dhul Hajja',
   };
-  const audienceColors = {
+  const defaultAudienceColors = {
     Lajna: '#b03060',
     Nasirat: '#f4a6c1',
     Ansar: '#1d4e89',
     Khuddam: '#1f3a5f',
     Atfal: '#75b8ff',
     'Tahir Academy': '#2f855a',
+    'Waqf-e-Nau': '#7c3aed',
     All: '#1f2937',
     Unspecified: '#4b5563',
   };
+  const audienceColorStorageKey = 'mycal.audience-colors.v1';
+  const audienceColors = loadAudienceColors();
   const eventModalEl = document.getElementById('eventModal');
   const eventModal = new bootstrap.Modal(eventModalEl);
   const eventForm = document.getElementById('eventForm');
@@ -117,6 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeEventId && activeEventOccurrenceDate === activeDate) {
         event.preventDefault();
         await openEventById(activeEventId);
+        return;
+      }
+      const dateItems = data.events[activeDate] || [];
+      const firstEvent = dateItems.find((item) => item.source_event_id && !item.is_holiday);
+      if (firstEvent) {
+        event.preventDefault();
+        selectEvent(firstEvent.source_event_id, activeDate);
+        await openEventById(firstEvent.source_event_id);
         return;
       }
       openEventModal({ start_date: activeDate, end_date: activeDate });
@@ -250,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const chip = document.createElement('a');
         chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
         chip.textContent = item.display_text;
-        chip.style.backgroundColor = item.color;
+        chip.style.backgroundColor = item.uses_custom_color ? item.color : colorForAudience(item.audience);
         chip.href = '#';
         if (item.source_event_id) {
           chip.dataset.sourceEventId = String(item.source_event_id);
@@ -619,10 +630,32 @@ document.addEventListener('DOMContentLoaded', () => {
       eventColorField.dataset.touched = 'true';
     });
 
-    document.getElementById('recurrenceType').addEventListener('change', () => {
+    document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        syncRecurringEndDate();
+        syncRecurrenceType();
+        buildDayLabels();
+      });
+    });
+    document.getElementById('clearRecurringWeekdays').addEventListener('click', () => {
+      document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      syncRecurrenceType();
       syncRecurringEndDate();
-      toggleWeeklyOptions();
-      buildDayLabels();
+      buildDayLabels(getCurrentLabelValues());
+    });
+    document.getElementById('eventRangeThisDay').addEventListener('click', () => {
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+      if (startDateInput.value) endDateInput.value = startDateInput.value;
+      buildDayLabels(getCurrentLabelValues());
+    });
+    document.getElementById('eventRangeFullMonth').addEventListener('click', () => {
+      const { start, end } = currentMonthBounds();
+      document.getElementById('startDate').value = start;
+      document.getElementById('endDate').value = end;
+      buildDayLabels(getCurrentLabelValues());
     });
     document.getElementById('allDay').addEventListener('change', syncAllDayState);
     document.getElementById('title').addEventListener('input', () => buildDayLabels(getCurrentLabelValues()));
@@ -633,7 +666,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('endDate').addEventListener('change', () => buildDayLabels(getCurrentLabelValues()));
 
     syncRecurringEndDate();
-    toggleWeeklyOptions();
+    setupAudienceColorSettings();
+    syncRecurrenceType();
     eventForm.addEventListener('submit', (event) => {
       const error = validateEventForm();
       if (error) {
@@ -669,13 +703,12 @@ document.addEventListener('DOMContentLoaded', () => {
     eventColorField.dataset.touched = payload.color ? 'true' : 'false';
     eventColorField.value = payload.color || colorForAudience(document.getElementById('audience').value);
     document.getElementById('notes').value = payload.notes || '';
-    document.getElementById('recurrenceType').value = payload.recurrence_type || 'none';
     document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
       checkbox.checked = (payload.recurrence_weekdays || '').split(',').includes(checkbox.value);
     });
+    syncRecurrenceType();
     syncRecurringEndDate(Boolean(payload.id));
     syncAllDayState();
-    toggleWeeklyOptions();
     buildDayLabels(payload.labels || {});
     eventModal.show();
   }
@@ -757,14 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function toggleWeeklyOptions() {
-    const isWeekly = document.getElementById('recurrenceType').value === 'weekly';
-    const weeklyOptions = document.getElementById('weeklyOptions');
-    weeklyOptions.classList.toggle('d-none', !isWeekly);
-    document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
-      checkbox.disabled = !isWeekly;
-      if (!isWeekly) checkbox.checked = false;
-    });
+  function syncRecurrenceType() {
+    const recurrenceTypeField = document.getElementById('recurrenceType');
+    const hasWeekdays = document.querySelectorAll('input[name="recurrence_weekdays"]:checked').length > 0;
+    recurrenceTypeField.value = hasWeekdays ? 'weekly' : 'none';
   }
 
   function validateEventForm() {
@@ -795,6 +824,41 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Choose at least one weekday for a weekly recurring event.';
     }
     return '';
+  }
+
+  function loadAudienceColors() {
+    try {
+      const stored = window.localStorage.getItem(audienceColorStorageKey);
+      if (!stored) return { ...defaultAudienceColors };
+      const parsed = JSON.parse(stored);
+      if (!parsed || typeof parsed !== 'object') return { ...defaultAudienceColors };
+      return Object.entries(defaultAudienceColors).reduce((acc, [audience, defaultColor]) => {
+        acc[audience] = typeof parsed[audience] === 'string' ? parsed[audience] : defaultColor;
+        return acc;
+      }, {});
+    } catch (error) {
+      return { ...defaultAudienceColors };
+    }
+  }
+
+  function persistAudienceColors() {
+    window.localStorage.setItem(audienceColorStorageKey, JSON.stringify(audienceColors));
+  }
+
+  function setupAudienceColorSettings() {
+    document.querySelectorAll('.audience-color-input').forEach((input) => {
+      const audience = input.dataset.audience;
+      if (!audience) return;
+      input.value = audienceColors[audience] || input.dataset.defaultColor || '#4b5563';
+      input.addEventListener('input', () => {
+        audienceColors[audience] = input.value;
+        persistAudienceColors();
+        if (document.getElementById('audience').value === audience && document.getElementById('eventColor').dataset.touched !== 'true') {
+          document.getElementById('eventColor').value = input.value;
+        }
+        renderCalendarDecorations();
+      });
+    });
   }
 
   function showMenu(menu, x, y) {

@@ -5,7 +5,7 @@ import { previewText, escapeHtml } from '../utils/text.js';
 import { contrastTextColor } from '../utils/colors.js';
 
 let weekdayBuilt = false;
-const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-tbla', { month: 'long', day: 'numeric', timeZone: 'UTC' });
 
 function getIslamicParts(iso) {
   const date = new Date(`${iso}T00:00:00Z`);
@@ -73,6 +73,7 @@ function simpleUSHolidays(year, month) {
 
 export function renderCalendar({
   state,
+  audienceColors,
   onSelectDate,
   onOpenEvent,
   onOpenActions,
@@ -101,7 +102,7 @@ export function renderCalendar({
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const visibleEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-  const events = visibleEventMap(state.doc.events, visibleStart, visibleEnd);
+  const events = visibleEventMap(state.doc.events, visibleStart, visibleEnd, audienceColors);
   const hiddenHolidayDates = new Set(state.doc.settings?.hiddenMeta?.holidays || []);
   const hiddenIslamicDates = new Set(state.doc.settings?.hiddenMeta?.islamic || []);
   const holidays = state.doc.settings.showUSHolidays ? simpleUSHolidays(year, month) : new Map();
@@ -148,6 +149,11 @@ export function renderCalendar({
         cell.addEventListener('dblclick', (event) => {
           const eventChip = event.target.closest('.event-chip');
           if (eventChip) return;
+          const firstEvent = (events[key] || []).find((item) => item.sourceEventId && !item.isHoliday);
+          if (firstEvent) {
+            onOpenEvent(firstEvent.sourceEventId);
+            return;
+          }
           onOpenActions(key);
         });
         cell.addEventListener('contextmenu', (event) => {

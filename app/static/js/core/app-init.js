@@ -1,4 +1,4 @@
-import { MONTH_NAMES, WEEKDAY_NAMES, AUDIENCE_CHOICES, RECURRENCE_CHOICES, LEGACY_STORAGE_KEY, TITLE_STORAGE_PREFIX } from './constants.js';
+import { MONTH_NAMES, WEEKDAY_NAMES, AUDIENCE_CHOICES, AUDIENCE_COLORS, LEGACY_STORAGE_KEY, TITLE_STORAGE_PREFIX } from './constants.js';
 import { appState, pushUndo } from './state.js';
 import { firstVisibleMonth, monthIso } from '../utils/dates.js';
 import { createDocumentForView } from '../models/document-model.js';
@@ -55,13 +55,43 @@ function fillSelects() {
     monthYearSel.add(new Option(label, `${year}-${String(month).padStart(2, '0')}`));
   }
   AUDIENCE_CHOICES.forEach((v) => document.getElementById('audience').add(new Option(v, v)));
-  RECURRENCE_CHOICES.forEach((v) => document.getElementById('recurrenceType').add(new Option(v[0].toUpperCase() + v.slice(1), v)));
   const wk = document.getElementById('weekdayCheckboxes');
   WEEKDAY_NAMES.forEach((w, i) => {
     const div = document.createElement('div');
     div.className = 'form-check';
     div.innerHTML = `<input class="form-check-input" type="checkbox" value="${i}" id="weekday${i}"><label class="form-check-label" for="weekday${i}">${w}</label>`;
     wk.appendChild(div);
+  });
+}
+
+function mergedAudienceColors() {
+  return { ...AUDIENCE_COLORS, ...(appState.doc.settings?.audienceColors || {}) };
+}
+
+function renderAudienceColorSettings() {
+  const host = document.getElementById('audienceColorSettings');
+  if (!host) return;
+  const merged = mergedAudienceColors();
+  host.innerHTML = '';
+  AUDIENCE_CHOICES.forEach((audience) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'col-md-6';
+    wrap.innerHTML = `
+      <label class="d-flex justify-content-between align-items-center small border rounded px-2 py-1">
+        <span>${audience} <span class="text-muted">(${AUDIENCE_COLORS[audience] || AUDIENCE_COLORS.Unspecified})</span></span>
+        <input type="color" class="form-control form-control-color audience-color-input" data-audience="${audience}" value="${merged[audience] || AUDIENCE_COLORS.Unspecified}">
+      </label>
+    `;
+    host.appendChild(wrap);
+  });
+  host.querySelectorAll('.audience-color-input').forEach((input) => {
+    input.addEventListener('input', () => {
+      const audience = input.dataset.audience;
+      if (!audience) return;
+      appState.doc.settings.audienceColors = { ...mergedAudienceColors(), [audience]: input.value };
+      schedulePersist(appState.doc, 'audience-color', setLastSaved);
+      rerender();
+    });
   });
 }
 
@@ -82,11 +112,13 @@ function renderUnscheduled() {
 
 function rerender() {
   syncTitle();
+  syncDateInputsToMonth();
   document.getElementById('monthYearSelect').value = `${appState.view.year}-${String(appState.view.month).padStart(2, '0')}`;
   document.getElementById('islamicToggle').checked = appState.doc.settings.showIslamicDates;
   document.getElementById('holidaysToggle').checked = appState.doc.settings.showUSHolidays;
   renderCalendar({
     state: appState,
+    audienceColors: mergedAudienceColors(),
     onSelectDate: ({ date, inMonth }) => {
       appState.activeDate = date;
       if (!inMonth) openCellEditor({ state: appState, date });
@@ -125,6 +157,7 @@ function rerender() {
     },
   });
   renderUnscheduled();
+  renderAudienceColorSettings();
 }
 
 function getThemeSettings() {
@@ -269,6 +302,7 @@ function setLastSaved(ts) {
 function openEventModal(payload) {
   const p = typeof payload === 'string' ? appState.doc.events.find((e) => e.id === payload) : payload;
   if (!p) return;
+  syncDateInputsToMonth();
   document.getElementById('eventId').value = p.id || '';
   document.getElementById('title').value = p.title || '';
   document.getElementById('startDate').value = p.startDate || p.start_date || '';
@@ -279,10 +313,33 @@ function openEventModal(payload) {
   document.getElementById('location').value = p.location || '';
   document.getElementById('audience').value = p.audience || 'Unspecified';
   document.getElementById('notes').value = p.notes || '';
-  document.getElementById('recurrenceType').value = p.recurrenceType || p.recurrence_type || 'none';
   document.querySelectorAll('#weekdayCheckboxes input').forEach((cb) => { cb.checked = (p.recurrenceWeekdays || []).includes(cb.value); });
+  syncRecurrenceTypeFromWeekdays();
   document.getElementById('deleteEventBtn').classList.toggle('d-none', !p.id);
   eventModal.show();
+}
+
+function monthBoundsIso() {
+  const month = String(appState.view.month).padStart(2, '0');
+  const start = `${appState.view.year}-${month}-01`;
+  const lastDay = new Date(Date.UTC(appState.view.year, appState.view.month, 0)).getUTCDate();
+  const end = `${appState.view.year}-${month}-${String(lastDay).padStart(2, '0')}`;
+  return { start, end };
+}
+
+function syncDateInputsToMonth() {
+  const startInput = document.getElementById('startDate');
+  const endInput = document.getElementById('endDate');
+  const { start, end } = monthBoundsIso();
+  startInput.min = start;
+  startInput.max = end;
+  endInput.min = start;
+  endInput.max = end;
+}
+
+function syncRecurrenceTypeFromWeekdays() {
+  const selected = document.querySelectorAll('#weekdayCheckboxes input:checked').length;
+  document.getElementById('recurrenceType').value = selected ? 'weekly' : 'none';
 }
 
 async function loadOrCreateDoc(year, month) {
@@ -323,8 +380,33 @@ function bindMainUI() {
   });
   monthYearSelect.addEventListener('change', applySelectedMonth);
 
+  document.querySelectorAll('#weekdayCheckboxes input').forEach((checkbox) => {
+    checkbox.addEventListener('change', syncRecurrenceTypeFromWeekdays);
+  });
+  document.getElementById('clearRecurringWeekdays').addEventListener('click', () => {
+    document.querySelectorAll('#weekdayCheckboxes input').forEach((checkbox) => { checkbox.checked = false; });
+    syncRecurrenceTypeFromWeekdays();
+  });
+  document.getElementById('eventRangeThisDay').addEventListener('click', () => {
+    const start = document.getElementById('startDate').value;
+    if (start) document.getElementById('endDate').value = start;
+  });
+  document.getElementById('eventRangeFullMonth').addEventListener('click', () => {
+    const { start, end } = monthBoundsIso();
+    document.getElementById('startDate').value = start;
+    document.getElementById('endDate').value = end;
+  });
+
   document.getElementById('eventForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    syncRecurrenceTypeFromWeekdays();
+    const { start, end } = monthBoundsIso();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    if (!startDate || !endDate || startDate < start || startDate > end || endDate < start || endDate > end) {
+      flash('Event start/end dates must stay within the selected month.', 'danger');
+      return;
+    }
     const payload = normalizeEvent({
       id: document.getElementById('eventId').value || uuid(),
       title: document.getElementById('title').value.trim(),

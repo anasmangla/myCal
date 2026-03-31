@@ -153,7 +153,7 @@
         <div class="modal-header">
           <div>
             <h5 class="modal-title">Event</h5>
-            <p class="text-muted small mb-0">Single-day, multi-day, daily, and weekly recurring events are all supported.</p>
+            <p class="text-muted small mb-0">Choose start/end dates within this month. Weekly recurrence is controlled by weekday checkboxes below.</p>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
@@ -167,14 +167,47 @@
             <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
             <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
             <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
+            <div class="col-md-6">
+              <div class="small text-muted mt-1">Quick date range:</div>
+              <div class="d-flex flex-wrap gap-2 mt-1">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeThisDay">Same day</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeFullMonth">Full month</button>
+              </div>
+            </div>
             <div class="col-md-3 form-check ms-2 mt-4"><input type="checkbox" class="form-check-input" name="all_day" id="allDay"><label class="form-check-label" for="allDay">All day</label></div>
             <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"></div>
             <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" name="end_time" id="endTime"></div>
             <div class="col-md-3"><label class="form-label">Audience</label><select class="form-select" name="audience" id="audience">{% for audience in audience_choices %}<option value="{{ audience }}">{{ audience }}</option>{% endfor %}</select></div>
             <div class="col-md-3"><label class="form-label">Event color</label><input type="color" class="form-control form-control-color w-100" name="color" id="eventColor" value="#4b5563"><div class="form-text">Optional override for event chip color.</div></div>
             <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" id="location" maxlength="200"></div>
-            <div class="col-md-3"><label class="form-label">Recurrence</label><select class="form-select" name="recurrence_type" id="recurrenceType">{% for recurrence in recurrence_choices %}<option value="{{ recurrence }}">{{ recurrence.title() }}</option>{% endfor %}</select></div>
-            <div class="col-md-12 d-none" id="weeklyOptions"><label class="form-label">Weekly recurrence weekdays</label><div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div><div class="form-text">Pick one or more weekdays when using weekly recurrence.</div></div>
+            <input type="hidden" name="recurrence_type" id="recurrenceType" value="none">
+            <div class="col-md-12" id="weeklyOptions">
+              <div class="d-flex justify-content-between align-items-center">
+                <label class="form-label mb-1">Weekly recurrence weekdays</label>
+                <button type="button" class="btn btn-link btn-sm p-0" id="clearRecurringWeekdays">Clear weekdays</button>
+              </div>
+              <div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div>
+              <div class="form-text">Check weekdays to repeat between start and end dates. Leave all unchecked for a non-recurring event.</div>
+            </div>
+            <div class="col-md-12">
+              <div class="border rounded p-2">
+                <div class="small fw-semibold mb-2">Audience colors</div>
+                <div class="small text-muted mb-2">Default colors are shown next to each audience. Update any audience color for this browser.</div>
+                <div class="row g-2" id="audienceColorSettings">
+                  {% for audience in audience_choices %}
+                  <div class="col-md-6">
+                    <label class="d-flex justify-content-between align-items-center small border rounded px-2 py-1">
+                      <span>
+                        {{ audience }}
+                        <span class="text-muted">({{ audience_default_colors[audience] }})</span>
+                      </span>
+                      <input type="color" class="form-control form-control-color audience-color-input" data-audience="{{ audience }}" data-default-color="{{ audience_default_colors[audience] }}" value="{{ audience_default_colors[audience] }}">
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
             <div class="col-md-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="notes" id="notes" maxlength="5000"></textarea></div>
             <div class="col-md-12">
               <label class="form-label">Custom per-day labels</label>
