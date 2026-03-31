@@ -205,6 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${monthName} Calendar`;
   }
 
+  function browserTabTitle() {
+    const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(data.selectedYear, data.selectedMonth - 1, 1)));
+    return `${monthName} ${data.selectedYear}`;
+  }
+
   function defaultCalendarTitle() {
     return monthCalendarLabel();
   }
@@ -217,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextValue = value.trim() || defaultCalendarTitle();
     titleDisplay.textContent = nextValue;
     titleInput.value = nextValue;
-    document.title = nextValue;
+    document.title = browserTabTitle();
     return nextValue;
   }
 

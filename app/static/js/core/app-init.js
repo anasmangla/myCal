@@ -78,12 +78,17 @@ function titleStorageKey(year, month) {
   return `${TITLE_STORAGE_PREFIX}.${year}-${String(month).padStart(2, '0')}`;
 }
 
+function browserTabTitle(year, month) {
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
 function syncTitle() {
   const key = titleStorageKey(appState.view.year, appState.view.month);
   const title = localStorage.getItem(key) || appState.doc.title;
   appState.doc.title = title;
   document.getElementById('calendarTitle').textContent = title;
   document.getElementById('calendarTitleInput').value = title;
+  document.title = browserTabTitle(appState.view.year, appState.view.month);
 }
 
 function fillSelects() {
