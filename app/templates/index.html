@@ -14,10 +14,13 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-auto form-check form-switch ms-lg-2">
-        <input type="hidden" name="islamic" value="0">
-        <input class="form-check-input" type="checkbox" role="switch" id="islamicToggle" name="islamic" value="1" {% if include_islamic %}checked{% endif %}>
-        <label class="form-check-label" for="islamicToggle">Islamic dates</label>
+      <div class="col-auto ms-lg-2">
+        <label class="form-label small mb-1" for="islamicToggle">Islamic dates</label>
+        <select class="form-select form-select-sm" id="islamicToggle" name="islamic" aria-label="Islamic dates visibility">
+          <option value="off" {% if islamic_mode == 'off' %}selected{% endif %}>Off</option>
+          <option value="full" {% if islamic_mode == 'full' %}selected{% endif %}>Full</option>
+          <option value="partial" {% if islamic_mode == 'partial' %}selected{% endif %}>Partial</option>
+        </select>
       </div>
       <div class="col-auto form-check form-switch">
         <input type="hidden" name="holidays" value="0">
@@ -140,7 +143,7 @@
           <input type="hidden" name="return_year" value="{{ selected_year }}">
           <input type="hidden" name="return_month" value="{{ selected_month }}">
           <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
-          <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+          <input type="hidden" name="return_islamic" value="{{ islamic_mode }}">
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
             <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
@@ -188,7 +191,7 @@
   <input type="hidden" name="return_year" value="{{ selected_year }}">
   <input type="hidden" name="return_month" value="{{ selected_month }}">
   <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
-  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ islamic_mode }}">
   <input type="hidden" name="delete_mode" id="deleteMode" value="all">
   <input type="hidden" name="occurrence_date" id="deleteOccurrenceDate" value="">
 </form>
@@ -196,7 +199,7 @@
   <input type="hidden" name="return_year" value="{{ selected_year }}">
   <input type="hidden" name="return_month" value="{{ selected_month }}">
   <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
-  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ islamic_mode }}">
   <input type="hidden" name="target_date" id="eventActionTargetDate">
   <input type="hidden" name="anchor_date" id="eventActionAnchorDate">
 </form>
@@ -204,7 +207,7 @@
   <input type="hidden" name="return_year" value="{{ selected_year }}">
   <input type="hidden" name="return_month" value="{{ selected_month }}">
   <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
-  <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
+  <input type="hidden" name="return_islamic" value="{{ islamic_mode }}">
   <input type="file" name="calendar_file" id="importDataFileInput" accept=".json,application/json">
 </form>
 <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
@@ -212,8 +215,12 @@
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('calendarMonthForm');
     const monthSelect = form?.querySelector('select[name="month_year"]');
+    const islamicSelect = form?.querySelector('select[name="islamic"]');
+    const holidaysToggle = form?.querySelector('input[name="holidays"][type="checkbox"]');
     if (!form || !monthSelect) return;
     monthSelect.addEventListener('change', () => form.submit());
+    islamicSelect?.addEventListener('change', () => form.submit());
+    holidaysToggle?.addEventListener('change', () => form.submit());
   });
 </script>
 {% endblock %}

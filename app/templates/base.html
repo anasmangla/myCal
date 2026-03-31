@@ -22,6 +22,7 @@
         selectedYear: {{ selected_year }},
         includeHolidays: {{ 'true' if include_holidays else 'false' }},
         includeIslamic: {{ 'true' if include_islamic else 'false' }},
+        islamicMode: {{ islamic_mode|tojson }},
       };
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
