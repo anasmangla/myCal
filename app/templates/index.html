@@ -15,6 +15,17 @@
         </select>
       </div>
       <div class="col-auto ms-lg-2">
+        <label class="form-label small mb-1 d-block">Islamic dates</label>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Islamic dates visibility">
+          <input type="radio" class="btn-check" name="islamic" id="islamicToggleOff" value="off" {% if islamic_mode == 'off' %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="islamicToggleOff">Off</label>
+
+          <input type="radio" class="btn-check" name="islamic" id="islamicToggleFull" value="full" {% if islamic_mode == 'full' %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="islamicToggleFull">Full</label>
+
+          <input type="radio" class="btn-check" name="islamic" id="islamicTogglePartial" value="partial" {% if islamic_mode == 'partial' %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="islamicTogglePartial">Partial</label>
+        </div>
         <label class="form-label small mb-1" for="islamicToggle">Islamic dates</label>
         <select class="form-select form-select-sm" id="islamicToggle" name="islamic" aria-label="Islamic dates visibility">
           <option value="off" {% if islamic_mode == 'off' %}selected{% endif %}>Off</option>
@@ -215,6 +226,11 @@
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('calendarMonthForm');
     const monthSelect = form?.querySelector('select[name="month_year"]');
+    const islamicToggles = form?.querySelectorAll('input[name="islamic"]');
+    const holidaysToggle = form?.querySelector('input[name="holidays"][type="checkbox"]');
+    if (!form || !monthSelect) return;
+    monthSelect.addEventListener('change', () => form.submit());
+    islamicToggles?.forEach((toggle) => toggle.addEventListener('change', () => form.submit()));
     const islamicSelect = form?.querySelector('select[name="islamic"]');
     const holidaysToggle = form?.querySelector('input[name="holidays"][type="checkbox"]');
     if (!form || !monthSelect) return;
