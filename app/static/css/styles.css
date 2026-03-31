@@ -583,21 +583,6 @@ body {
   outline-offset: 1px;
 }
 
-.outside-month-empty-hint {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem;
-  text-align: center;
-  color: #64748b;
-  font-size: 0.66rem;
-  line-height: 1.3;
-  border: 1px dashed rgba(148, 163, 184, 0.45);
-  border-radius: 0.6rem;
-  background: rgba(255, 255, 255, 0.45);
-}
-
 .image-trash-dropzone {
   position: fixed;
   left: 50%;

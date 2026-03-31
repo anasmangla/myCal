@@ -229,7 +229,6 @@ export function renderCalendar({
               </div>
             ` : `
               <div class="cell-note-preview cell-note-fit ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
-              <div class="outside-month-empty-hint ${preview || cellData?.attachments?.length ? 'd-none' : ''}">Double-click to type notes</div>
             `}
             <div class="cell-image-strip"></div>
           </div>
