@@ -38,6 +38,8 @@ body {
   border-radius: 1rem;
   box-shadow: var(--shadow);
   padding: 0.85rem 1rem;
+  position: relative;
+  z-index: 1200;
 }
 
 .action-bar {
@@ -54,6 +56,7 @@ body {
 
 .color-settings-menu {
   min-width: 15rem;
+  z-index: 1300;
 }
 
 .no-print .btn {
