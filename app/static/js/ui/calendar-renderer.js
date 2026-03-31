@@ -7,14 +7,38 @@ import { contrastTextColor } from '../utils/colors.js';
 
 let weekdayBuilt = false;
 const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-tbla', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+const islamicMonthNameMap = {
+  Muharram: 'Muharram',
+  Safar: 'Safar',
+  'Rabiʻ I': 'Rabi al-Awwal',
+  'Rabiʻ II': 'Rabi al-Thani',
+  'Jumada I': 'Jumada al-Awwal',
+  'Jumada II': 'Jumada al-Thani',
+  Rajab: 'Rajab',
+  'Shaʻban': "Sha'ban",
+  Ramadan: 'Ramadhan',
+  Shawwal: 'Shawwal',
+  'Dhuʻl-Qiʻdah': "Dhul Qi'dah",
+  'Dhuʻl-Hijjah': 'Dhul Hajja',
+};
 
 function getIslamicParts(iso) {
   const date = new Date(`${iso}T00:00:00Z`);
   const parts = islamicFormatter.formatToParts(date);
+  const rawMonth = parts.find((part) => part.type === 'month')?.value || '';
   return {
-    month: parts.find((part) => part.type === 'month')?.value || '',
+    month: islamicMonthNameMap[rawMonth] || rawMonth,
     day: Number(parts.find((part) => part.type === 'day')?.value || 0),
   };
+}
+
+function ordinal(day) {
+  const mod10 = day % 10;
+  const mod100 = day % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${day}st`;
+  if (mod10 === 2 && mod100 !== 12) return `${day}nd`;
+  if (mod10 === 3 && mod100 !== 13) return `${day}rd`;
+  return `${day}th`;
 }
 
 function buildIslamicLabels(iso) {
@@ -22,7 +46,7 @@ function buildIslamicLabels(iso) {
   const isFirstGregorian = iso.endsWith('-01');
   const isFirstIslamic = islamic.day === 1;
   if (!isFirstGregorian && !isFirstIslamic) return [];
-  return [{ text: `${islamic.month} ${islamic.day}`, italic: true, important: false }];
+  return [{ text: `${ordinal(islamic.day)} of ${islamic.month}`, italic: true, important: false }];
 }
 
 function simpleUSHolidays(year, month) {
