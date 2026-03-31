@@ -52,38 +52,86 @@
       </div>
       <div class="d-flex gap-2 action-bar">
         <div class="dropdown">
-          <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" id="colorSettingsToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-            <i class="bi bi-palette me-1" aria-hidden="true"></i>Colors
+          <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" id="settingsToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Settings
           </button>
-          <div class="dropdown-menu p-3 color-settings-menu" aria-labelledby="colorSettingsToggle">
-            <div class="mb-2 fw-semibold small text-uppercase text-muted">Calendar colors</div>
-            <div class="mb-2">
-              <label class="form-label small mb-1" for="nonDateColorInput">Non-dates color</label>
-              <input type="color" class="form-control form-control-color w-100" id="nonDateColorInput" value="#f5f5f5">
+          <div class="dropdown-menu p-3 settings-menu" aria-labelledby="settingsToggle">
+            <div class="settings-section">
+              <div class="fw-semibold small text-uppercase text-muted">Calendar colors</div>
+              <div class="settings-section-note">Tune the calendar palette and grid weight.</div>
+              <div class="settings-grid mt-2">
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="nonDateColorInput">Non-dates color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="nonDateColorInput" value="#f5f5f5">
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="weekendHolidayColorInput">Weekend/holiday color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="weekendHolidayColorInput" value="#d9d9d9">
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="weekdayColorInput">Weekday header color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="weekdayColorInput" value="#0f172a">
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="lineColorInput">Grid line color</label>
+                  <input type="color" class="form-control form-control-color w-100" id="lineColorInput" value="#d6deea">
+                </div>
+                <div class="settings-field settings-field-wide">
+                  <label class="form-label small mb-1 d-flex justify-content-between" for="lineThicknessInput">
+                    <span>Grid line thickness</span><span id="lineThicknessValue">1px</span>
+                  </label>
+                  <input type="range" class="form-range" id="lineThicknessInput" min="1" max="4" step="0.5" value="1">
+                </div>
+              </div>
             </div>
-            <div class="mb-2">
-              <label class="form-label small mb-1" for="weekendHolidayColorInput">Weekend/holiday color</label>
-              <input type="color" class="form-control form-control-color w-100" id="weekendHolidayColorInput" value="#d9d9d9">
+            <div class="settings-section">
+              <div class="fw-semibold small text-uppercase text-muted">Typography</div>
+              <div class="settings-section-note">Change the calendar font stack and sizing for the on-screen and printed view.</div>
+              <div class="settings-grid mt-2">
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="bodyFontPresetSelect">Calendar font</label>
+                  <select class="form-select form-select-sm" id="bodyFontPresetSelect">
+                    <option value="system">System Sans</option>
+                    <option value="trebuchet">Trebuchet Sans</option>
+                    <option value="georgia">Georgia Serif</option>
+                    <option value="palatino">Palatino Serif</option>
+                    <option value="verdana">Verdana Sans</option>
+                  </select>
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1" for="titleFontPresetSelect">Title font</label>
+                  <select class="form-select form-select-sm" id="titleFontPresetSelect">
+                    <option value="system">System Sans</option>
+                    <option value="trebuchet">Trebuchet Sans</option>
+                    <option value="georgia">Georgia Serif</option>
+                    <option value="palatino">Palatino Serif</option>
+                    <option value="verdana">Verdana Sans</option>
+                  </select>
+                </div>
+                <div class="settings-field settings-field-wide">
+                  <label class="form-label small mb-1 d-flex justify-content-between" for="bodyFontSizeInput">
+                    <span>Calendar text size</span><span id="bodyFontSizeValue">0.95rem</span>
+                  </label>
+                  <input type="range" class="form-range" id="bodyFontSizeInput" min="0.85" max="1.15" step="0.05" value="0.95">
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1 d-flex justify-content-between" for="titleFontSizeInput">
+                    <span>Title size</span><span id="titleFontSizeValue">1.15rem</span>
+                  </label>
+                  <input type="range" class="form-range" id="titleFontSizeInput" min="1.00" max="1.50" step="0.05" value="1.15">
+                </div>
+                <div class="settings-field">
+                  <label class="form-label small mb-1 d-flex justify-content-between" for="eventFontSizeInput">
+                    <span>Event chip size</span><span id="eventFontSizeValue">0.62rem</span>
+                  </label>
+                  <input type="range" class="form-range" id="eventFontSizeInput" min="0.55" max="0.85" step="0.01" value="0.62">
+                </div>
+              </div>
             </div>
-            <div class="mb-2">
-              <label class="form-label small mb-1" for="weekdayColorInput">Weekdays header color</label>
-              <input type="color" class="form-control form-control-color w-100" id="weekdayColorInput" value="#0f172a">
-            </div>
-            <div class="mb-2">
-              <label class="form-label small mb-1" for="lineColorInput">Lines color</label>
-              <input type="color" class="form-control form-control-color w-100" id="lineColorInput" value="#d6deea">
-            </div>
-            <div class="mb-2">
-              <label class="form-label small mb-1 d-flex justify-content-between" for="lineThicknessInput">
-                <span>Line thickness</span><span id="lineThicknessValue">1px</span>
-              </label>
-              <input type="range" class="form-range" id="lineThicknessInput" min="1" max="4" step="0.5" value="1">
-            </div>
-            <button type="button" class="btn btn-link btn-sm p-0" id="resetColorSettingsBtn">Reset defaults</button>
-            <div class="mt-3 pt-3 border-top">
-              <div class="mb-2 fw-semibold small text-uppercase text-muted">Audience colors</div>
-              <div class="small text-muted mb-2">Default event chip colors by audience.</div>
-              <div class="audience-color-settings-list" id="audienceColorSettings">
+            <div class="settings-section">
+              <div class="fw-semibold small text-uppercase text-muted">Audience colors</div>
+              <div class="settings-section-note">Set the default event chip color used for each audience.</div>
+              <div class="audience-color-settings-list mt-2" id="audienceColorSettings">
                 {% for audience in audience_choices %}
                 <label class="audience-color-setting">
                   <span class="audience-color-setting-label">
@@ -95,6 +143,7 @@
                 {% endfor %}
               </div>
             </div>
+            <button type="button" class="btn btn-link btn-sm p-0 mt-3" id="resetSettingsBtn">Reset defaults</button>
           </div>
         </div>
         <button class="btn btn-outline-primary btn-sm" type="button" data-print-mode="month">

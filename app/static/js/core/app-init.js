@@ -19,13 +19,54 @@ import { searchDocument } from '../features/search.js';
 let eventModal;
 let activeDateContext = '';
 let activeEventContext = { eventId: '', occurrenceDate: '' };
+const FONT_PRESETS = {
+  system: '"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+  trebuchet: '"Trebuchet MS", "Segoe UI", sans-serif',
+  georgia: 'Georgia, "Times New Roman", serif',
+  palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+};
 const defaultThemeSettings = {
   outsideMonthColor: '#f5f5f5',
   weekendHolidayColor: '#d9d9d9',
   weekdayHeaderColor: '#0f172a',
   lineColor: '#d6deea',
   lineThickness: 1,
+  bodyFontPreset: 'system',
+  titleFontPreset: 'system',
+  bodyFontSize: 0.95,
+  titleFontSize: 1.15,
+  eventFontSize: 0.62,
 };
+
+function fontStackForPreset(preset) {
+  return FONT_PRESETS[preset] || FONT_PRESETS.system;
+}
+
+function themeNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatRemValue(value) {
+  return `${themeNumber(value, 0).toFixed(2)}rem`;
+}
+
+function derivedThemeSizes(theme) {
+  const bodyFontSize = themeNumber(theme.bodyFontSize, defaultThemeSettings.bodyFontSize);
+  const titleFontSize = themeNumber(theme.titleFontSize, defaultThemeSettings.titleFontSize);
+  const eventFontSize = themeNumber(theme.eventFontSize, defaultThemeSettings.eventFontSize);
+
+  return {
+    bodyFontSize,
+    titleFontSize,
+    eventFontSize,
+    weekdayFontSize: Math.max(0.72, Number((bodyFontSize - 0.13).toFixed(2))),
+    dayNumberFontSize: Math.max(0.82, Number((bodyFontSize - 0.05).toFixed(2))),
+    metaFontSize: Math.max(0.54, Number((bodyFontSize - 0.36).toFixed(2))),
+    noteFontSize: Math.max(0.56, Number((bodyFontSize - 0.35).toFixed(2))),
+  };
+}
 
 function uuid() {
   return crypto.randomUUID ? crypto.randomUUID() : `doc_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -168,12 +209,22 @@ function getThemeSettings() {
 
 function applyThemeSettings() {
   const theme = getThemeSettings();
+  const sizes = derivedThemeSizes(theme);
   const root = document.documentElement;
   root.style.setProperty('--outside-month-color', theme.outsideMonthColor);
   root.style.setProperty('--weekend-color', theme.weekendHolidayColor);
   root.style.setProperty('--weekday-header-color', theme.weekdayHeaderColor);
   root.style.setProperty('--grid-line-color', theme.lineColor);
   root.style.setProperty('--grid-line-width', `${theme.lineThickness}px`);
+  root.style.setProperty('--calendar-font-family', fontStackForPreset(theme.bodyFontPreset));
+  root.style.setProperty('--calendar-title-font-family', fontStackForPreset(theme.titleFontPreset));
+  root.style.setProperty('--calendar-body-font-size', formatRemValue(sizes.bodyFontSize));
+  root.style.setProperty('--calendar-title-font-size', formatRemValue(sizes.titleFontSize));
+  root.style.setProperty('--calendar-weekday-font-size', formatRemValue(sizes.weekdayFontSize));
+  root.style.setProperty('--calendar-day-number-font-size', formatRemValue(sizes.dayNumberFontSize));
+  root.style.setProperty('--calendar-meta-font-size', formatRemValue(sizes.metaFontSize));
+  root.style.setProperty('--calendar-event-font-size', formatRemValue(sizes.eventFontSize));
+  root.style.setProperty('--calendar-note-font-size', formatRemValue(sizes.noteFontSize));
 }
 
 function bindThemeControls() {
@@ -183,7 +234,15 @@ function bindThemeControls() {
   const lineColorInput = document.getElementById('lineColorInput');
   const lineThicknessInput = document.getElementById('lineThicknessInput');
   const lineThicknessValue = document.getElementById('lineThicknessValue');
-  const resetColorSettingsBtn = document.getElementById('resetColorSettingsBtn');
+  const bodyFontPresetSelect = document.getElementById('bodyFontPresetSelect');
+  const titleFontPresetSelect = document.getElementById('titleFontPresetSelect');
+  const bodyFontSizeInput = document.getElementById('bodyFontSizeInput');
+  const bodyFontSizeValue = document.getElementById('bodyFontSizeValue');
+  const titleFontSizeInput = document.getElementById('titleFontSizeInput');
+  const titleFontSizeValue = document.getElementById('titleFontSizeValue');
+  const eventFontSizeInput = document.getElementById('eventFontSizeInput');
+  const eventFontSizeValue = document.getElementById('eventFontSizeValue');
+  const resetSettingsBtn = document.getElementById('resetSettingsBtn');
 
   if (!nonDateColorInput) return;
 
@@ -195,6 +254,14 @@ function bindThemeControls() {
     lineColorInput.value = theme.lineColor;
     lineThicknessInput.value = String(theme.lineThickness);
     lineThicknessValue.textContent = `${theme.lineThickness}px`;
+    bodyFontPresetSelect.value = theme.bodyFontPreset;
+    titleFontPresetSelect.value = theme.titleFontPreset;
+    bodyFontSizeInput.value = String(theme.bodyFontSize);
+    bodyFontSizeValue.textContent = formatRemValue(theme.bodyFontSize);
+    titleFontSizeInput.value = String(theme.titleFontSize);
+    titleFontSizeValue.textContent = formatRemValue(theme.titleFontSize);
+    eventFontSizeInput.value = String(theme.eventFontSize);
+    eventFontSizeValue.textContent = formatRemValue(theme.eventFontSize);
   };
 
   const updateTheme = (patch) => {
@@ -210,7 +277,12 @@ function bindThemeControls() {
   weekdayColorInput.addEventListener('input', () => updateTheme({ weekdayHeaderColor: weekdayColorInput.value }));
   lineColorInput.addEventListener('input', () => updateTheme({ lineColor: lineColorInput.value }));
   lineThicknessInput.addEventListener('input', () => updateTheme({ lineThickness: Number(lineThicknessInput.value) }));
-  resetColorSettingsBtn.addEventListener('click', () => updateTheme({ ...defaultThemeSettings }));
+  bodyFontPresetSelect.addEventListener('change', () => updateTheme({ bodyFontPreset: bodyFontPresetSelect.value }));
+  titleFontPresetSelect.addEventListener('change', () => updateTheme({ titleFontPreset: titleFontPresetSelect.value }));
+  bodyFontSizeInput.addEventListener('input', () => updateTheme({ bodyFontSize: Number(bodyFontSizeInput.value) }));
+  titleFontSizeInput.addEventListener('input', () => updateTheme({ titleFontSize: Number(titleFontSizeInput.value) }));
+  eventFontSizeInput.addEventListener('input', () => updateTheme({ eventFontSize: Number(eventFontSizeInput.value) }));
+  resetSettingsBtn.addEventListener('click', () => updateTheme({ ...defaultThemeSettings }));
 
   syncControls();
 }

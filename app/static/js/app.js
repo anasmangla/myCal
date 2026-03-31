@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
     Unspecified: '#4b5563',
   };
   const audienceColorStorageKey = 'mycal.audience-colors.v1';
+  const fontPresets = {
+    system: '"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+    trebuchet: '"Trebuchet MS", "Segoe UI", sans-serif',
+    georgia: 'Georgia, "Times New Roman", serif',
+    palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
+    verdana: 'Verdana, Geneva, sans-serif',
+  };
   const audienceColors = loadAudienceColors();
   const eventModalEl = document.getElementById('eventModal');
   const eventModal = new bootstrap.Modal(eventModalEl);
@@ -50,7 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const lineColorInput = document.getElementById('lineColorInput');
   const lineThicknessInput = document.getElementById('lineThicknessInput');
   const lineThicknessValue = document.getElementById('lineThicknessValue');
-  const resetColorSettingsBtn = document.getElementById('resetColorSettingsBtn');
+  const bodyFontPresetSelect = document.getElementById('bodyFontPresetSelect');
+  const titleFontPresetSelect = document.getElementById('titleFontPresetSelect');
+  const bodyFontSizeInput = document.getElementById('bodyFontSizeInput');
+  const bodyFontSizeValue = document.getElementById('bodyFontSizeValue');
+  const titleFontSizeInput = document.getElementById('titleFontSizeInput');
+  const titleFontSizeValue = document.getElementById('titleFontSizeValue');
+  const eventFontSizeInput = document.getElementById('eventFontSizeInput');
+  const eventFontSizeValue = document.getElementById('eventFontSizeValue');
+  const resetSettingsBtn = document.getElementById('resetSettingsBtn');
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
@@ -61,6 +76,11 @@ document.addEventListener('DOMContentLoaded', () => {
     weekdayHeaderColor: '#0f172a',
     lineColor: '#d6deea',
     lineThickness: 1,
+    bodyFontPreset: 'system',
+    titleFontPreset: 'system',
+    bodyFontSize: 0.95,
+    titleFontSize: 1.15,
+    eventFontSize: 0.62,
   };
   let themeSettings = loadThemeSettings();
 
@@ -430,6 +450,35 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'mycal.theme.settings.v1';
   }
 
+  function fontStackForPreset(preset) {
+    return fontPresets[preset] || fontPresets.system;
+  }
+
+  function themeNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function formatRemValue(value) {
+    return `${themeNumber(value, 0).toFixed(2)}rem`;
+  }
+
+  function derivedThemeSizes(theme) {
+    const bodyFontSize = themeNumber(theme.bodyFontSize, defaultThemeSettings.bodyFontSize);
+    const titleFontSize = themeNumber(theme.titleFontSize, defaultThemeSettings.titleFontSize);
+    const eventFontSize = themeNumber(theme.eventFontSize, defaultThemeSettings.eventFontSize);
+
+    return {
+      bodyFontSize,
+      titleFontSize,
+      eventFontSize,
+      weekdayFontSize: Math.max(0.72, Number((bodyFontSize - 0.13).toFixed(2))),
+      dayNumberFontSize: Math.max(0.82, Number((bodyFontSize - 0.05).toFixed(2))),
+      metaFontSize: Math.max(0.54, Number((bodyFontSize - 0.36).toFixed(2))),
+      noteFontSize: Math.max(0.56, Number((bodyFontSize - 0.35).toFixed(2))),
+    };
+  }
+
   function loadThemeSettings() {
     try {
       const parsed = JSON.parse(window.localStorage.getItem(themeSettingsStorageKey()) || '{}');
@@ -444,12 +493,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyThemeSettings() {
+    const sizes = derivedThemeSizes(themeSettings);
     const root = document.documentElement;
     root.style.setProperty('--outside-month-color', themeSettings.outsideMonthColor);
     root.style.setProperty('--weekend-color', themeSettings.weekendHolidayColor);
     root.style.setProperty('--weekday-header-color', themeSettings.weekdayHeaderColor);
     root.style.setProperty('--grid-line-color', themeSettings.lineColor);
     root.style.setProperty('--grid-line-width', `${themeSettings.lineThickness}px`);
+    root.style.setProperty('--calendar-font-family', fontStackForPreset(themeSettings.bodyFontPreset));
+    root.style.setProperty('--calendar-title-font-family', fontStackForPreset(themeSettings.titleFontPreset));
+    root.style.setProperty('--calendar-body-font-size', formatRemValue(sizes.bodyFontSize));
+    root.style.setProperty('--calendar-title-font-size', formatRemValue(sizes.titleFontSize));
+    root.style.setProperty('--calendar-weekday-font-size', formatRemValue(sizes.weekdayFontSize));
+    root.style.setProperty('--calendar-day-number-font-size', formatRemValue(sizes.dayNumberFontSize));
+    root.style.setProperty('--calendar-meta-font-size', formatRemValue(sizes.metaFontSize));
+    root.style.setProperty('--calendar-event-font-size', formatRemValue(sizes.eventFontSize));
+    root.style.setProperty('--calendar-note-font-size', formatRemValue(sizes.noteFontSize));
+    scaleCalendar();
   }
 
   function setupColorSettings() {
@@ -461,6 +521,14 @@ document.addEventListener('DOMContentLoaded', () => {
     lineColorInput.value = themeSettings.lineColor;
     lineThicknessInput.value = String(themeSettings.lineThickness);
     lineThicknessValue.textContent = `${themeSettings.lineThickness}px`;
+    bodyFontPresetSelect.value = themeSettings.bodyFontPreset;
+    titleFontPresetSelect.value = themeSettings.titleFontPreset;
+    bodyFontSizeInput.value = String(themeSettings.bodyFontSize);
+    bodyFontSizeValue.textContent = formatRemValue(themeSettings.bodyFontSize);
+    titleFontSizeInput.value = String(themeSettings.titleFontSize);
+    titleFontSizeValue.textContent = formatRemValue(themeSettings.titleFontSize);
+    eventFontSizeInput.value = String(themeSettings.eventFontSize);
+    eventFontSizeValue.textContent = formatRemValue(themeSettings.eventFontSize);
 
     nonDateColorInput.addEventListener('input', () => {
       themeSettings.outsideMonthColor = nonDateColorInput.value;
@@ -488,8 +556,36 @@ document.addEventListener('DOMContentLoaded', () => {
       applyThemeSettings();
       saveThemeSettings();
     });
+    bodyFontPresetSelect.addEventListener('change', () => {
+      themeSettings.bodyFontPreset = bodyFontPresetSelect.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    titleFontPresetSelect.addEventListener('change', () => {
+      themeSettings.titleFontPreset = titleFontPresetSelect.value;
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    bodyFontSizeInput.addEventListener('input', () => {
+      themeSettings.bodyFontSize = Number(bodyFontSizeInput.value);
+      bodyFontSizeValue.textContent = formatRemValue(themeSettings.bodyFontSize);
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    titleFontSizeInput.addEventListener('input', () => {
+      themeSettings.titleFontSize = Number(titleFontSizeInput.value);
+      titleFontSizeValue.textContent = formatRemValue(themeSettings.titleFontSize);
+      applyThemeSettings();
+      saveThemeSettings();
+    });
+    eventFontSizeInput.addEventListener('input', () => {
+      themeSettings.eventFontSize = Number(eventFontSizeInput.value);
+      eventFontSizeValue.textContent = formatRemValue(themeSettings.eventFontSize);
+      applyThemeSettings();
+      saveThemeSettings();
+    });
 
-    resetColorSettingsBtn.addEventListener('click', () => {
+    resetSettingsBtn.addEventListener('click', () => {
       themeSettings = { ...defaultThemeSettings };
       applyThemeSettings();
       nonDateColorInput.value = themeSettings.outsideMonthColor;
@@ -498,6 +594,14 @@ document.addEventListener('DOMContentLoaded', () => {
       lineColorInput.value = themeSettings.lineColor;
       lineThicknessInput.value = String(themeSettings.lineThickness);
       lineThicknessValue.textContent = `${themeSettings.lineThickness}px`;
+      bodyFontPresetSelect.value = themeSettings.bodyFontPreset;
+      titleFontPresetSelect.value = themeSettings.titleFontPreset;
+      bodyFontSizeInput.value = String(themeSettings.bodyFontSize);
+      bodyFontSizeValue.textContent = formatRemValue(themeSettings.bodyFontSize);
+      titleFontSizeInput.value = String(themeSettings.titleFontSize);
+      titleFontSizeValue.textContent = formatRemValue(themeSettings.titleFontSize);
+      eventFontSizeInput.value = String(themeSettings.eventFontSize);
+      eventFontSizeValue.textContent = formatRemValue(themeSettings.eventFontSize);
       saveThemeSettings();
     });
   }
