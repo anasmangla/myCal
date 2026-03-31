@@ -1,5 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
   const data = window.CALENDAR_DATA;
+  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const islamicMonthNameMap = {
+    Muharram: 'Muharram',
+    Safar: 'Safar',
+    "Rabiʻ I": 'Rabi al-Awwal',
+    "Rabiʻ II": 'Rabi al-Thani',
+    'Jumada I': 'Jumada al-Awwal',
+    'Jumada II': 'Jumada al-Thani',
+    Rajab: 'Rajab',
+    "Shaʻban": "Sha'ban",
+    Ramadan: 'Ramadhan',
+    Shawwal: 'Shawwal',
+    "Dhuʻl-Qiʻdah": "Dhul Qi'dah",
+    "Dhuʻl-Hijjah": 'Dhul Hajja',
+  };
   const audienceColors = {
     Lajna: '#b03060',
     Nasirat: '#f4a6c1',
@@ -278,6 +293,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function getIslamicParts(iso) {
+    const parts = islamicFormatter.formatToParts(new Date(`${iso}T00:00:00Z`));
+    const rawMonth = parts.find((part) => part.type === 'month')?.value || '';
+    return {
+      month: islamicMonthNameMap[rawMonth] || rawMonth,
+      day: Number(parts.find((part) => part.type === 'day')?.value || 0),
+    };
+  }
+
+  function ordinal(day) {
+    const mod10 = day % 10;
+    const mod100 = day % 100;
+    if (mod10 === 1 && mod100 !== 11) return `${day}st`;
+    if (mod10 === 2 && mod100 !== 12) return `${day}nd`;
+    if (mod10 === 3 && mod100 !== 13) return `${day}rd`;
+    return `${day}th`;
+  }
+
+  function islamicLabelForDate(iso) {
+    const mode = (data.islamicMode || 'partial').toLowerCase();
+    if (mode === 'off') return '';
+
+    const islamic = getIslamicParts(iso);
+    const isFirstGregorian = iso.endsWith('-01');
+    const isFirstIslamic = islamic.day === 1;
+    if (mode === 'partial' && !isFirstGregorian && !isFirstIslamic) return '';
+    return `${ordinal(islamic.day)} of ${islamic.month}`;
+  }
+
   function setupEventDragAndDrop() {
     document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
       cell.addEventListener('dragenter', (event) => {
@@ -354,15 +398,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const day = new Date(`${iso}T00:00:00`);
       const jsDay = day.getUTCDay();
       const showHoliday = Boolean(data.holidays[iso]) && !isHiddenMeta('holidays', iso);
-      const showIslamic = Boolean(data.includeIslamic) && !isHiddenMeta('islamic', iso);
+      const islamicLabel = !isHiddenMeta('islamic', iso) ? islamicLabelForDate(iso) : '';
       if (jsDay === 0 || jsDay === 6) cell.classList.add('weekend');
       cell.classList.toggle('holiday', showHoliday);
       if (data.longWeekends.includes(iso)) cell.classList.add('long-weekend');
       if (data.styles[iso]) cell.style.background = data.styles[iso];
       const holidayPill = cell.querySelector('.holiday-pill');
       if (holidayPill) {
-        holidayPill.innerHTML = '';
-        holidayPill.classList.remove('holiday-pill-long', 'has-content');
+        const lines = [];
+        if (showHoliday && data.holidays[iso]) lines.push(`<span class="calendar-meta-line">${escapeHtml(data.holidays[iso])}</span>`);
+        if (islamicLabel) lines.push(`<span class="calendar-meta-line islamic-note">${escapeHtml(islamicLabel)}</span>`);
+        holidayPill.innerHTML = lines.join('');
+        holidayPill.classList.toggle('has-content', lines.length > 0);
+        holidayPill.classList.remove('holiday-pill-long');
       }
     });
   }
@@ -883,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const islamicButton = document.getElementById('contextToggleIslamic');
     const selectableDate = isSelectableDate(activeDate);
     const hasHoliday = Boolean(activeDate && data.holidays[activeDate]);
-    const hasIslamic = Boolean(selectableDate && data.includeIslamic);
+    const hasIslamic = Boolean(selectableDate && (data.islamicMode || 'partial') !== 'off');
     const holidayHidden = Boolean(activeDate && isHiddenMeta('holidays', activeDate));
     const islamicHidden = Boolean(activeDate && isHiddenMeta('islamic', activeDate));
 

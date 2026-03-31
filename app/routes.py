@@ -50,7 +50,10 @@ def index():
         selected_month_date = date(year, month, 1)
 
     include_holidays = request.args.get('holidays', '1') == '1'
-    include_islamic = request.args.get('islamic', '1') == '1'
+    islamic_mode = (request.args.get('islamic', 'partial') or 'partial').strip().lower()
+    if islamic_mode not in {'off', 'full', 'partial'}:
+        islamic_mode = 'partial'
+    include_islamic = islamic_mode != 'off'
     context = month_context(year, month, include_holidays)
     month_year_options = []
     cursor = min_month
@@ -71,6 +74,7 @@ def index():
         month_year_options=month_year_options,
         month_names=MONTH_NAMES,
         include_holidays=include_holidays,
+        islamic_mode=islamic_mode,
         include_islamic=include_islamic,
         audience_choices=AUDIENCE_CHOICES,
         recurrence_choices=RECURRENCE_CHOICES,
@@ -526,5 +530,5 @@ def _return_url():
     year = request.form.get('return_year')
     month = request.form.get('return_month')
     holidays = request.form.get('return_holidays', '1')
-    islamic = request.form.get('return_islamic', '1')
+    islamic = request.form.get('return_islamic', 'partial')
     return url_for('calendar.index', year=year, month=month, holidays=holidays, islamic=islamic)
