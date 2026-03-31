@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from io import BytesIO
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
@@ -353,6 +353,30 @@ def export_data():
     )
 
 
+@bp.get('/data/export.ics')
+def export_ics():
+    year, month = _export_month()
+    month_start = date(year, month, 1)
+    month_end = _add_months(month_start, 1) - timedelta(days=1)
+    events = (
+        Event.query
+        .filter(Event.end_date >= month_start, Event.start_date <= month_end)
+        .order_by(Event.start_date.asc(), Event.id.asc())
+        .all()
+    )
+    content = _build_ics_calendar(
+        _visible_ics_occurrences(events, month_start, month_end),
+        f'{MONTH_NAMES[month - 1]} {year}',
+    )
+    filename = f'mycal-{year}-{month:02d}.ics'
+    return send_file(
+        BytesIO(content.encode('utf-8')),
+        mimetype='text/calendar',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
 @bp.post('/data/import')
 def import_data():
     upload = request.files.get('calendar_file')
@@ -486,6 +510,166 @@ def _delete_single_occurrence(event: Event, occurrence_day):
         return
 
     db.session.delete(event)
+
+
+def _export_month() -> tuple[int, int]:
+    default_year, default_month = first_visible_month()
+    month_year = (request.args.get('month_year') or '').strip()
+    if month_year:
+        try:
+            parsed_year, parsed_month = month_year.split('-', 1)
+            year = int(parsed_year)
+            month = int(parsed_month)
+            date(year, month, 1)
+            return year, month
+        except (TypeError, ValueError):
+            return default_year, default_month
+
+    year = request.args.get('year', default=default_year, type=int)
+    month = request.args.get('month', default=default_month, type=int)
+    try:
+        date(year, month, 1)
+    except ValueError:
+        return default_year, default_month
+    return year, month
+
+
+def _visible_ics_occurrences(events: list[Event], visible_start: date, visible_end: date) -> list[dict]:
+    rows: list[dict] = []
+    for event in events:
+        labels = {item.day_offset: item.label for item in event.day_labels}
+        if event.recurrence_type == 'none':
+            span_days = (event.end_date - event.start_date).days + 1
+            for offset in range(span_days):
+                current_day = event.start_date + timedelta(days=offset)
+                if current_day < visible_start or current_day > visible_end:
+                    continue
+                rows.append(
+                    {
+                        'event_id': event.id,
+                        'date': current_day,
+                        'summary': labels.get(offset, f'Day {offset + 1}: {event.title}' if span_days > 1 else event.title),
+                        'title': event.title,
+                        'start_time': event.start_time,
+                        'all_day': bool(event.all_day or event.start_time is None),
+                        'location': event.location,
+                        'audience': event.audience,
+                        'notes': event.notes,
+                    }
+                )
+            continue
+
+        current_day = max(event.start_date, visible_start)
+        recurrence_end = min(event.end_date, visible_end)
+        while current_day <= recurrence_end:
+            if event.recurrence_type == 'daily' or (
+                event.recurrence_type == 'weekly' and day_in_weekly_pattern(current_day, event.recurrence_weekdays)
+            ):
+                rows.append(
+                    {
+                        'event_id': event.id,
+                        'date': current_day,
+                        'summary': event.title,
+                        'title': event.title,
+                        'start_time': event.start_time,
+                        'all_day': bool(event.all_day or event.start_time is None),
+                        'location': event.location,
+                        'audience': event.audience,
+                        'notes': event.notes,
+                    }
+                )
+            current_day += timedelta(days=1)
+
+    rows.sort(
+        key=lambda item: (
+            item['date'],
+            not item['all_day'],
+            item['start_time'] or time.max,
+            item['summary'],
+            item['event_id'],
+        )
+    )
+    return rows
+
+
+def _build_ics_calendar(rows: list[dict], calendar_name: str) -> str:
+    exported_at = datetime.now(UTC).replace(microsecond=0)
+    lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//myCal//Monthly Planner//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        f'X-WR-CALNAME:{_ics_escape(calendar_name)}',
+    ]
+
+    for item in rows:
+        summary = item['summary'] or item['title'] or 'Untitled event'
+        uid_value = f"{item['event_id']}-{item['date'].isoformat()}-{calendar_name}"
+        description_parts = []
+        if summary != item['title']:
+            description_parts.append(f"Series: {item['title']}")
+        if item['audience']:
+            description_parts.append(f"Audience: {item['audience']}")
+        if item['notes']:
+            description_parts.append(item['notes'])
+
+        lines.extend(
+            [
+                'BEGIN:VEVENT',
+                f'UID:{_ics_escape(uid_value)}@mycal.local',
+                f"DTSTAMP:{_format_ics_utc(exported_at)}",
+                f'SUMMARY:{_ics_escape(summary)}',
+            ]
+        )
+        if item['all_day']:
+            lines.append(f"DTSTART;VALUE=DATE:{_format_ics_date(item['date'])}")
+            lines.append(f"DTEND;VALUE=DATE:{_format_ics_date(item['date'] + timedelta(days=1))}")
+        elif item['start_time'] is not None:
+            lines.append(f"DTSTART:{_format_ics_datetime(item['date'], item['start_time'])}")
+        else:
+            lines.append(f"DTSTART;VALUE=DATE:{_format_ics_date(item['date'])}")
+            lines.append(f"DTEND;VALUE=DATE:{_format_ics_date(item['date'] + timedelta(days=1))}")
+        if item['location']:
+            lines.append(f"LOCATION:{_ics_escape(item['location'])}")
+        if item['audience']:
+            lines.append(f"CATEGORIES:{_ics_escape(item['audience'])}")
+        if description_parts:
+            lines.append(f"DESCRIPTION:{_ics_escape('\n\n'.join(description_parts))}")
+        lines.append('END:VEVENT')
+
+    lines.append('END:VCALENDAR')
+    return _fold_ics_lines(lines)
+
+
+def _format_ics_date(value: date) -> str:
+    return value.strftime('%Y%m%d')
+
+
+def _format_ics_datetime(day_value: date, time_value: time) -> str:
+    return f"{day_value.strftime('%Y%m%d')}T{time_value.strftime('%H%M%S')}"
+
+
+def _format_ics_utc(value: datetime) -> str:
+    return value.strftime('%Y%m%dT%H%M%SZ')
+
+
+def _ics_escape(value: str) -> str:
+    return value.replace('\\', '\\\\').replace('\r\n', '\n').replace('\n', '\\n').replace(';', '\\;').replace(',', '\\,')
+
+
+def _fold_ics_lines(lines: list[str]) -> str:
+    folded: list[str] = []
+    for line in lines:
+        if len(line) <= 75:
+            folded.append(line)
+            continue
+        folded.append(line[:75])
+        remainder = line[75:]
+        while remainder:
+            folded.append(f' {remainder[:74]}')
+            remainder = remainder[74:]
+    return '\r\n'.join(folded) + '\r\n'
 def _build_event_from_import(item):
     if not isinstance(item, dict):
         raise ValidationError('Each event must be an object.')

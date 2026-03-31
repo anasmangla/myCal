@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
-from datetime import date
+from datetime import date, time
 from io import BytesIO
 
 from app import create_app, db
@@ -140,6 +140,53 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertTrue(payload.all_day)
         self.assertIsNone(payload.start_time)
         self.assertIsNone(payload.end_time)
+
+    def test_export_ics_includes_visible_month_occurrences(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                Event(
+                    title='Retreat',
+                    start_date=date(2026, 4, 10),
+                    end_date=date(2026, 4, 12),
+                    audience='All',
+                    recurrence_type='none',
+                    all_day=True,
+                )
+            )
+            db.session.add(
+                Event(
+                    title='Team sync',
+                    start_date=date(2026, 4, 15),
+                    end_date=date(2026, 4, 15),
+                    start_time=time(18, 30),
+                    audience='All',
+                    recurrence_type='none',
+                    all_day=False,
+                )
+            )
+            db.session.add(
+                Event(
+                    title='May planning',
+                    start_date=date(2026, 5, 1),
+                    end_date=date(2026, 5, 1),
+                    audience='All',
+                    recurrence_type='none',
+                    all_day=True,
+                )
+            )
+            db.session.commit()
+
+        response = self.client.get('/data/export.ics?month_year=2026-04&holidays=0')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, 'text/calendar')
+
+        content = response.data.decode('utf-8')
+        self.assertIn('BEGIN:VCALENDAR', content)
+        self.assertEqual(content.count('BEGIN:VEVENT'), 4)
+        self.assertIn('DTSTART;VALUE=DATE:20260410', content)
+        self.assertIn('DTEND;VALUE=DATE:20260411', content)
+        self.assertIn('DTSTART:20260415T183000', content)
+        self.assertNotIn('20260501', content)
 
 
 if __name__ == '__main__':

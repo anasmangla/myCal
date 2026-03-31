@@ -152,6 +152,9 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="exportImageBtn">
           <i class="bi bi-image me-1" aria-hidden="true"></i>Export image
         </button>
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_ics', month_year=selected_month_year, holidays=1 if include_holidays else 0) }}">
+          <i class="bi bi-calendar2-event me-1" aria-hidden="true"></i>Export ICS
+        </a>
         <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_data') }}">
           <i class="bi bi-download me-1" aria-hidden="true"></i>Export JSON
         </a>

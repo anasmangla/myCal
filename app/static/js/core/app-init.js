@@ -11,7 +11,7 @@ import { migrateLegacyState } from './migration.js';
 import { openCellEditor, saveCellFromPanel } from '../features/cell-editor.js';
 import { setCellColor } from '../features/cell-colors.js';
 import { addImageToCell, removeImageFromCell } from '../features/attachments.js';
-import { exportDocumentJson, parseImportJson } from '../features/import-export.js';
+import { exportDocumentIcs, exportDocumentJson, parseImportJson } from '../features/import-export.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
 import { searchDocument } from '../features/search.js';
@@ -564,6 +564,7 @@ function bindMainUI() {
   });
 
   document.getElementById('exportJsonBtn').addEventListener('click', () => exportDocumentJson(appState.doc));
+  document.getElementById('exportIcsBtn').addEventListener('click', () => exportDocumentIcs(appState.doc));
   document.getElementById('importJsonInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
