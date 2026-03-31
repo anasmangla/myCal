@@ -143,8 +143,8 @@
           <input type="hidden" name="return_islamic" value="{{ 1 if include_islamic else 0 }}">
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
-            <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" required></div>
-            <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" required></div>
+            <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
+            <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
             <div class="col-md-3 form-check ms-2 mt-4"><input type="checkbox" class="form-check-input" name="all_day" id="allDay"><label class="form-check-label" for="allDay">All day</label></div>
             <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"></div>
             <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" name="end_time" id="endTime"></div>
