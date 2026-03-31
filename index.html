@@ -201,7 +201,7 @@
             <div class="modal-header">
               <div>
                 <h5 class="modal-title">Event</h5>
-                <p class="text-muted small mb-0">Use weekday checkboxes for weekly recurrence between start and end dates.</p>
+                <p class="text-muted small mb-0">Use weekday checkboxes for weekly recurrence. Leave start time blank for an all-day event.</p>
               </div>
               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -211,16 +211,7 @@
                 <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="title" maxlength="200" required></div>
                 <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" id="startDate" required></div>
                 <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" id="endDate" required></div>
-                <div class="col-md-6">
-                  <div class="small text-muted mt-1">Quick date range:</div>
-                  <div class="d-flex flex-wrap gap-2 mt-1">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeThisDay">Same day</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeFullMonth">Full month</button>
-                  </div>
-                </div>
-                <div class="col-md-3 form-check ms-2 mt-4"><input type="checkbox" class="form-check-input" id="allDay"><label class="form-check-label" for="allDay">All day</label></div>
-                <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" id="startTime"></div>
-                <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" id="endTime"></div>
+                <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" id="startTime"><div class="form-text">Leave blank for an all-day event.</div></div>
                 <div class="col-md-3"><label class="form-label">Audience</label><select class="form-select" id="audience"></select></div>
                 <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" id="location" maxlength="200"></div>
                 <input type="hidden" id="recurrenceType" value="none">

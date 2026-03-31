@@ -217,7 +217,7 @@
         <div class="modal-header">
           <div>
             <h5 class="modal-title">Event</h5>
-            <p class="text-muted small mb-0">Choose start/end dates within this month. Weekly recurrence is controlled by weekday checkboxes below.</p>
+            <p class="text-muted small mb-0">Choose start/end dates within this month. Leave start time blank for an all-day event.</p>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
@@ -231,16 +231,7 @@
             <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
             <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
             <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
-            <div class="col-md-6">
-              <div class="small text-muted mt-1">Quick date range:</div>
-              <div class="d-flex flex-wrap gap-2 mt-1">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeThisDay">Same day</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="eventRangeFullMonth">Full month</button>
-              </div>
-            </div>
-            <div class="col-md-3 form-check ms-2 mt-4"><input type="checkbox" class="form-check-input" name="all_day" id="allDay"><label class="form-check-label" for="allDay">All day</label></div>
-            <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"></div>
-            <div class="col-md-3"><label class="form-label">End time</label><input type="time" class="form-control" name="end_time" id="endTime"></div>
+            <div class="col-md-3"><label class="form-label">Start time</label><input type="time" class="form-control" name="start_time" id="startTime"><div class="form-text">Leave blank for an all-day event.</div></div>
             <div class="col-md-3"><label class="form-label">Audience</label><select class="form-select" name="audience" id="audience">{% for audience in audience_choices %}<option value="{{ audience }}">{{ audience }}</option>{% endfor %}</select></div>
             <div class="col-md-3"><label class="form-label">Event color</label><input type="color" class="form-control form-control-color w-100" name="color" id="eventColor" value="#4b5563"><div class="form-text">Optional override for event chip color.</div></div>
             <div class="col-md-6"><label class="form-label">Location</label><input class="form-control" name="location" id="location" maxlength="200"></div>

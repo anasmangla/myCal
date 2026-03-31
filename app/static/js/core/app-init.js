@@ -380,9 +380,7 @@ function openEventModal(payload) {
   document.getElementById('title').value = p.title || '';
   document.getElementById('startDate').value = p.startDate || p.start_date || '';
   document.getElementById('endDate').value = p.endDate || p.end_date || p.startDate || p.start_date || '';
-  document.getElementById('allDay').checked = Boolean(p.allDay ?? p.all_day);
   document.getElementById('startTime').value = p.startTime || p.start_time || '';
-  document.getElementById('endTime').value = p.endTime || p.end_time || '';
   document.getElementById('location').value = p.location || '';
   document.getElementById('audience').value = p.audience || 'Unspecified';
   document.getElementById('notes').value = p.notes || '';
@@ -460,15 +458,6 @@ function bindMainUI() {
     document.querySelectorAll('#weekdayCheckboxes input').forEach((checkbox) => { checkbox.checked = false; });
     syncRecurrenceTypeFromWeekdays();
   });
-  document.getElementById('eventRangeThisDay').addEventListener('click', () => {
-    const start = document.getElementById('startDate').value;
-    if (start) document.getElementById('endDate').value = start;
-  });
-  document.getElementById('eventRangeFullMonth').addEventListener('click', () => {
-    const { start, end } = monthBoundsIso();
-    document.getElementById('startDate').value = start;
-    document.getElementById('endDate').value = end;
-  });
 
   document.getElementById('eventForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -485,9 +474,8 @@ function bindMainUI() {
       title: document.getElementById('title').value.trim(),
       startDate: document.getElementById('startDate').value,
       endDate: document.getElementById('endDate').value,
-      allDay: document.getElementById('allDay').checked,
       startTime: document.getElementById('startTime').value,
-      endTime: document.getElementById('endTime').value,
+      allDay: !document.getElementById('startTime').value,
       location: document.getElementById('location').value.trim(),
       audience: document.getElementById('audience').value,
       notes: document.getElementById('notes').value.trim(),

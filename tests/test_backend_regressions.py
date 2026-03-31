@@ -7,9 +7,10 @@ from io import BytesIO
 
 from app import create_app, db
 from app.calendar_utils import build_month_grid, build_week_metadata
-from app.event_utils import ValidationError
+from app.event_utils import ValidationError, parse_event_form
 from app.models import Event
 from app.routes import _build_event_from_import
+from werkzeug.datastructures import ImmutableMultiDict
 
 
 class BackendRegressionTests(unittest.TestCase):
@@ -120,6 +121,25 @@ class BackendRegressionTests(unittest.TestCase):
     def test_week_labels_are_portable_and_human_readable(self) -> None:
         weeks = build_week_metadata(build_month_grid(2026, 4), 4)
         self.assertEqual(weeks[0].label, 'Apr 1 - Apr 4')
+
+    def test_parse_event_form_treats_blank_start_time_as_all_day(self) -> None:
+        payload = parse_event_form(
+            ImmutableMultiDict(
+                [
+                    ('title', 'Board retreat'),
+                    ('start_date', '2026-04-10'),
+                    ('end_date', '2026-04-10'),
+                    ('start_time', ''),
+                    ('audience', 'All'),
+                    ('return_year', '2026'),
+                    ('return_month', '4'),
+                ]
+            )
+        )
+
+        self.assertTrue(payload.all_day)
+        self.assertIsNone(payload.start_time)
+        self.assertIsNone(payload.end_time)
 
 
 if __name__ == '__main__':

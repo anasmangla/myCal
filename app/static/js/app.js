@@ -749,19 +749,6 @@ document.addEventListener('DOMContentLoaded', () => {
       syncRecurringEndDate();
       buildDayLabels(getCurrentLabelValues());
     });
-    document.getElementById('eventRangeThisDay').addEventListener('click', () => {
-      const startDateInput = document.getElementById('startDate');
-      const endDateInput = document.getElementById('endDate');
-      if (startDateInput.value) endDateInput.value = startDateInput.value;
-      buildDayLabels(getCurrentLabelValues());
-    });
-    document.getElementById('eventRangeFullMonth').addEventListener('click', () => {
-      const { start, end } = currentMonthBounds();
-      document.getElementById('startDate').value = start;
-      document.getElementById('endDate').value = end;
-      buildDayLabels(getCurrentLabelValues());
-    });
-    document.getElementById('allDay').addEventListener('change', syncAllDayState);
     document.getElementById('title').addEventListener('input', () => buildDayLabels(getCurrentLabelValues()));
     document.getElementById('startDate').addEventListener('change', () => {
       syncRecurringEndDate();
@@ -799,8 +786,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('startDate').value = payload.start_date || payload.startDate || '';
     document.getElementById('endDate').value = payload.end_date || payload.endDate || payload.start_date || '';
     document.getElementById('startTime').value = payload.start_time || '';
-    document.getElementById('endTime').value = payload.end_time || '';
-    document.getElementById('allDay').checked = Boolean(payload.all_day);
     document.getElementById('location').value = payload.location || '';
     document.getElementById('audience').value = payload.audience || 'Unspecified';
     const eventColorField = document.getElementById('eventColor');
@@ -812,7 +797,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     syncRecurrenceType();
     syncRecurringEndDate(Boolean(payload.id));
-    syncAllDayState();
     buildDayLabels(payload.labels || {});
     eventModal.show();
   }
@@ -884,16 +868,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return values;
   }
 
-  function syncAllDayState() {
-    const allDay = document.getElementById('allDay').checked;
-    document.getElementById('startTime').disabled = allDay;
-    document.getElementById('endTime').disabled = allDay;
-    if (allDay) {
-      document.getElementById('startTime').value = '';
-      document.getElementById('endTime').value = '';
-    }
-  }
-
   function syncRecurrenceType() {
     const recurrenceTypeField = document.getElementById('recurrenceType');
     const hasWeekdays = document.querySelectorAll('input[name="recurrence_weekdays"]:checked').length > 0;
@@ -905,9 +879,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     const recurrenceType = document.getElementById('recurrenceType').value;
-    const startTime = document.getElementById('startTime').value;
-    const endTime = document.getElementById('endTime').value;
-    const allDay = document.getElementById('allDay').checked;
     const selectedWeekdays = document.querySelectorAll('input[name="recurrence_weekdays"]:checked').length;
     const { start: monthStart, end: monthEnd } = currentMonthBounds();
 
@@ -921,9 +892,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!Number.isFinite(spanDays)) return 'Please choose valid event dates.';
     if (spanDays < 1) return 'End date cannot be before start date.';
     if (recurrenceType === 'none' && spanDays > 10) return 'Multi-day events cannot exceed 10 days.';
-    if (!allDay && startTime && endTime && startDate === endDate && endTime < startTime) {
-      return 'End time cannot be earlier than start time for the same day.';
-    }
     if (recurrenceType === 'weekly' && selectedWeekdays === 0) {
       return 'Choose at least one weekday for a weekly recurring event.';
     }

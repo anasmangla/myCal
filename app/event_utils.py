@@ -101,7 +101,8 @@ def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
     title = (form.get('title') or '').strip()
     start_date = parse_iso_date(form.get('start_date'), 'Start date')
     end_date = parse_iso_date(form.get('end_date'), 'End date')
-    all_day = form.get('all_day') == 'on'
+    start_time = parse_hhmm_time(form.get('start_time'), 'Start time')
+    all_day = start_time is None
     selected_weekdays = [item for item in form.getlist('recurrence_weekdays') if item in VALID_WEEKDAY_VALUES]
     recurrence_type = 'weekly' if selected_weekdays else (form.get('recurrence_type') or 'none').strip().lower()
 
@@ -110,8 +111,8 @@ def parse_event_form(form: ImmutableMultiDict[str, str]) -> EventPayload:
         title=title,
         start_date=start_date,
         end_date=end_date,
-        start_time=None if all_day else parse_hhmm_time(form.get('start_time'), 'Start time'),
-        end_time=None if all_day else parse_hhmm_time(form.get('end_time'), 'End time'),
+        start_time=start_time,
+        end_time=None,
         all_day=all_day,
         location=sanitize_optional_text(form.get('location'), max_length=MAX_LOCATION_LENGTH),
         audience=(form.get('audience') or 'Unspecified').strip(),
@@ -162,9 +163,6 @@ def validate_event_payload(payload: EventPayload, month_scope: EventMonthScope, 
     span_days = event_span_days(payload.start_date, payload.end_date)
     if payload.recurrence_type == 'none' and span_days > MAX_MULTI_DAY_SPAN:
         raise ValidationError(f'Multi-day events cannot exceed {MAX_MULTI_DAY_SPAN} days.')
-
-    if not payload.all_day and payload.start_time and payload.end_time and payload.end_time < payload.start_time:
-        raise ValidationError('End time cannot be earlier than start time for the same day.')
 
     if payload.recurrence_type == 'weekly':
         if raw_weekday_count == 0:

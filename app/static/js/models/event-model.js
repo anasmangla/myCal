@@ -1,14 +1,15 @@
 import { nowIso } from '../utils/dates.js';
 
 export function normalizeEvent(event) {
+  const startTime = event.startTime || event.start_time || '';
   return {
     id: event.id,
     title: event.title || '',
     startDate: event.startDate || event.start_date,
     endDate: event.endDate || event.end_date,
-    allDay: Boolean(event.allDay ?? event.all_day),
-    startTime: event.startTime || event.start_time || '',
-    endTime: event.endTime || event.end_time || '',
+    allDay: event.allDay ?? event.all_day ?? !startTime,
+    startTime,
+    endTime: '',
     audience: event.audience || 'Unspecified',
     location: event.location || '',
     notes: event.notes || '',
