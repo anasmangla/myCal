@@ -260,7 +260,10 @@ function moveEvent(eventId, targetDate, anchorDate) {
 
 function setLastSaved(ts) {
   appState.lastSavedAt = ts;
-  document.getElementById('lastSavedText').textContent = ts ? `Last saved: ${new Date(ts).toLocaleTimeString()}` : 'Not saved yet';
+  const lastSavedText = document.getElementById('lastSavedText');
+  if (lastSavedText) {
+    lastSavedText.textContent = ts ? `Last saved: ${new Date(ts).toLocaleTimeString()}` : 'Not saved yet';
+  }
 }
 
 function openEventModal(payload) {
@@ -452,11 +455,14 @@ function bindMainUI() {
     rerender();
   });
 
-  document.getElementById('searchInput').addEventListener('input', (event) => {
-    const out = document.getElementById('searchResults');
-    const results = searchDocument(appState.doc, event.target.value, { events: true, notes: true });
-    out.innerHTML = results.slice(0, 8).map((r) => `<li class="list-group-item">${r.label}</li>`).join('');
-  });
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => {
+      const out = document.getElementById('searchResults');
+      const results = searchDocument(appState.doc, event.target.value, { events: true, notes: true });
+      out.innerHTML = results.slice(0, 8).map((r) => `<li class="list-group-item">${r.label}</li>`).join('');
+    });
+  }
 
   document.getElementById('undoBtn').addEventListener('click', () => {
     const prev = appState.undoStack.pop();
