@@ -20,7 +20,7 @@ function formatOccurrenceDisplay(label, startTime, location, allDay) {
   return `${prefix}${label}${location ? ` @ ${location}` : ''}`;
 }
 
-export function visibleEventMap(events, visibleStartIso, visibleEndIso) {
+export function visibleEventMap(events, visibleStartIso, visibleEndIso, audienceColors = AUDIENCE_COLORS) {
   const grouped = {};
   const visibleStart = parseIsoDate(visibleStartIso);
   const visibleEnd = parseIsoDate(visibleEndIso);
@@ -42,7 +42,7 @@ export function visibleEventMap(events, visibleStartIso, visibleEndIso) {
           title: event.title,
           displayText: formatOccurrenceDisplay(label, event.startTime, event.location, event.allDay),
           notes: event.notes,
-          color: event.color || AUDIENCE_COLORS[event.audience] || AUDIENCE_COLORS.Unspecified,
+          color: event.color || audienceColors[event.audience] || audienceColors.Unspecified,
         });
       }
       return;
@@ -63,7 +63,7 @@ export function visibleEventMap(events, visibleStartIso, visibleEndIso) {
         title: event.title,
         displayText: formatOccurrenceDisplay(event.title, event.startTime, event.location, event.allDay),
         notes: event.notes,
-        color: event.color || AUDIENCE_COLORS[event.audience] || AUDIENCE_COLORS.Unspecified,
+        color: event.color || audienceColors[event.audience] || audienceColors.Unspecified,
       });
     }
   });

@@ -21,7 +21,7 @@ export const MONTH_NAMES = [
 
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const AUDIENCE_CHOICES = ['All', 'Ansar', 'Khuddam', 'Atfal', 'Nasirat', 'Lajna', 'Tahir Academy', 'Unspecified'];
+export const AUDIENCE_CHOICES = ['All', 'Ansar', 'Khuddam', 'Atfal', 'Nasirat', 'Lajna', 'Tahir Academy', 'Waqf-e-Nau', 'Unspecified'];
 
 export const AUDIENCE_COLORS = {
   Lajna: '#b03060',
@@ -30,6 +30,7 @@ export const AUDIENCE_COLORS = {
   Khuddam: '#1f3a5f',
   Atfal: '#75b8ff',
   'Tahir Academy': '#2f855a',
+  'Waqf-e-Nau': '#7c3aed',
   All: '#1f2937',
   Unspecified: '#4b5563',
 };

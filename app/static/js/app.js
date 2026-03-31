@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const data = window.CALENDAR_DATA;
-  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-tbla', { month: 'long', day: 'numeric', timeZone: 'UTC' });
   const islamicMonthNameMap = {
     Muharram: 'Muharram',
     Safar: 'Safar',
@@ -120,6 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeEventId && activeEventOccurrenceDate === activeDate) {
         event.preventDefault();
         await openEventById(activeEventId);
+        return;
+      }
+      const dateItems = data.events[activeDate] || [];
+      const firstEvent = dateItems.find((item) => item.source_event_id && !item.is_holiday);
+      if (firstEvent) {
+        event.preventDefault();
+        selectEvent(firstEvent.source_event_id, activeDate);
+        await openEventById(firstEvent.source_event_id);
         return;
       }
       openEventModal({ start_date: activeDate, end_date: activeDate });
