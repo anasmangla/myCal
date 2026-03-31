@@ -80,6 +80,21 @@
               <input type="range" class="form-range" id="lineThicknessInput" min="1" max="4" step="0.5" value="1">
             </div>
             <button type="button" class="btn btn-link btn-sm p-0" id="resetColorSettingsBtn">Reset defaults</button>
+            <div class="mt-3 pt-3 border-top">
+              <div class="mb-2 fw-semibold small text-uppercase text-muted">Audience colors</div>
+              <div class="small text-muted mb-2">Default event chip colors by audience.</div>
+              <div class="audience-color-settings-list" id="audienceColorSettings">
+                {% for audience in audience_choices %}
+                <label class="audience-color-setting">
+                  <span class="audience-color-setting-label">
+                    <span>{{ audience }}</span>
+                    <span class="text-muted">{{ audience_default_colors[audience] }}</span>
+                  </span>
+                  <input type="color" class="form-control form-control-color audience-color-input" data-audience="{{ audience }}" data-default-color="{{ audience_default_colors[audience] }}" value="{{ audience_default_colors[audience] }}">
+                </label>
+                {% endfor %}
+              </div>
+            </div>
           </div>
         </div>
         <button class="btn btn-outline-primary btn-sm" type="button" data-print-mode="month">
@@ -188,25 +203,6 @@
               </div>
               <div class="d-flex flex-wrap gap-3">{% for value, label in weekday_choices %}<div class="form-check"><input class="form-check-input" type="checkbox" name="recurrence_weekdays" value="{{ value }}" id="weekday{{ value }}"><label class="form-check-label" for="weekday{{ value }}">{{ label }}</label></div>{% endfor %}</div>
               <div class="form-text">Check weekdays to repeat between start and end dates. Leave all unchecked for a non-recurring event.</div>
-            </div>
-            <div class="col-md-12">
-              <div class="border rounded p-2">
-                <div class="small fw-semibold mb-2">Audience colors</div>
-                <div class="small text-muted mb-2">Default colors are shown next to each audience. Update any audience color for this browser.</div>
-                <div class="row g-2" id="audienceColorSettings">
-                  {% for audience in audience_choices %}
-                  <div class="col-md-6">
-                    <label class="d-flex justify-content-between align-items-center small border rounded px-2 py-1">
-                      <span>
-                        {{ audience }}
-                        <span class="text-muted">({{ audience_default_colors[audience] }})</span>
-                      </span>
-                      <input type="color" class="form-control form-control-color audience-color-input" data-audience="{{ audience }}" data-default-color="{{ audience_default_colors[audience] }}" value="{{ audience_default_colors[audience] }}">
-                    </label>
-                  </div>
-                  {% endfor %}
-                </div>
-              </div>
             </div>
             <div class="col-md-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="notes" id="notes" maxlength="5000"></textarea></div>
             <div class="col-md-12">

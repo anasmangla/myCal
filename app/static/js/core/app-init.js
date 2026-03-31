@@ -74,13 +74,14 @@ function renderAudienceColorSettings() {
   const merged = mergedAudienceColors();
   host.innerHTML = '';
   AUDIENCE_CHOICES.forEach((audience) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'col-md-6';
+    const wrap = document.createElement('label');
+    wrap.className = 'audience-color-setting';
     wrap.innerHTML = `
-      <label class="d-flex justify-content-between align-items-center small border rounded px-2 py-1">
-        <span>${audience} <span class="text-muted">(${AUDIENCE_COLORS[audience] || AUDIENCE_COLORS.Unspecified})</span></span>
+      <span class="audience-color-setting-label">
+        <span>${audience}</span>
+        <span class="text-muted">${AUDIENCE_COLORS[audience] || AUDIENCE_COLORS.Unspecified}</span>
+      </span>
         <input type="color" class="form-control form-control-color audience-color-input" data-audience="${audience}" value="${merged[audience] || AUDIENCE_COLORS.Unspecified}">
-      </label>
     `;
     host.appendChild(wrap);
   });

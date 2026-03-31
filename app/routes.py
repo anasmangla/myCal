@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
@@ -118,7 +118,7 @@ def _return_month_bounds() -> tuple[date, date] | None:
 
 @bp.get('/api/event/<int:event_id>')
 def get_event(event_id: int):
-    event = Event.query.get_or_404(event_id)
+    event = db.get_or_404(Event, event_id)
     labels = {label.day_offset: label.label for label in event.day_labels}
     return jsonify(
         {
@@ -151,7 +151,7 @@ def save_event():
             if payload.start_date < month_start or payload.end_date > month_end:
                 raise ValidationError('Event dates for add/edit must stay within the current month.')
 
-        event = Event.query.get(payload.event_id) if payload.event_id else Event()
+        event = db.session.get(Event, payload.event_id) if payload.event_id else Event()
         if payload.event_id and event is None:
             raise ValidationError('The event you tried to edit no longer exists.')
         if not payload.event_id:
@@ -186,7 +186,7 @@ def save_event():
 
 @bp.post('/events/delete/<int:event_id>')
 def delete_event(event_id: int):
-    event = Event.query.get_or_404(event_id)
+    event = db.get_or_404(Event, event_id)
     delete_mode = (request.form.get('delete_mode') or 'all').strip().lower()
     occurrence_raw = request.form.get('occurrence_date')
 
@@ -216,7 +216,7 @@ def delete_event(event_id: int):
 
 @bp.post('/events/duplicate/<int:event_id>')
 def duplicate_event(event_id: int):
-    source = Event.query.get_or_404(event_id)
+    source = db.get_or_404(Event, event_id)
     duplicate = _clone_event(source)
     duplicate.title = f'Copy of {source.title}'
     db.session.add(duplicate)
@@ -227,7 +227,7 @@ def duplicate_event(event_id: int):
 
 @bp.post('/events/move/<int:event_id>')
 def move_event(event_id: int):
-    event = Event.query.get_or_404(event_id)
+    event = db.get_or_404(Event, event_id)
     try:
         target_date = _parse_day(request.form.get('target_date'))
         anchor_raw = request.form.get('anchor_date')
@@ -236,10 +236,16 @@ def move_event(event_id: int):
         flash(str(exc), 'danger')
         return redirect(_return_url())
 
+    month_bounds = _return_month_bounds()
     if event.recurrence_type != 'none' and anchor_raw:
         if not _is_valid_occurrence_date(event, anchor_date):
             flash('The selected recurring occurrence could not be moved.', 'danger')
             return redirect(_return_url())
+        if month_bounds is not None:
+            month_start, month_end = month_bounds
+            if target_date < month_start or target_date > month_end:
+                flash('Moved event must stay within the current month.', 'danger')
+                return redirect(_return_url())
 
         moved_event = _clone_event(event)
         moved_event.start_date = target_date
@@ -255,8 +261,16 @@ def move_event(event_id: int):
         return redirect(_return_url())
 
     delta_days = (target_date - anchor_date).days
-    event.start_date = event.start_date + timedelta(days=delta_days)
-    event.end_date = event.end_date + timedelta(days=delta_days)
+    next_start = event.start_date + timedelta(days=delta_days)
+    next_end = event.end_date + timedelta(days=delta_days)
+    if month_bounds is not None:
+        month_start, month_end = month_bounds
+        if next_start < month_start or next_end > month_end:
+            flash('Moved event must stay within the current month.', 'danger')
+            return redirect(_return_url())
+
+    event.start_date = next_start
+    event.end_date = next_end
     db.session.commit()
     flash('Event moved.', 'success')
     return redirect(_return_url())
@@ -295,6 +309,7 @@ def clear_date_style():
 
 @bp.get('/data/export')
 def export_data():
+    exported_at = datetime.now(UTC).replace(microsecond=0)
     events = []
     for event in Event.query.order_by(Event.start_date.asc(), Event.id.asc()).all():
         events.append(
@@ -308,6 +323,7 @@ def export_data():
                 'location': event.location,
                 'audience': event.audience,
                 'notes': event.notes,
+                'color': event.color,
                 'recurrence_type': event.recurrence_type,
                 'recurrence_weekdays': event.recurrence_weekdays,
                 'day_labels': [
@@ -323,11 +339,11 @@ def export_data():
     ]
     payload = {
         'version': 1,
-        'exported_at': datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
+        'exported_at': exported_at.isoformat().replace('+00:00', 'Z'),
         'events': events,
         'date_styles': styles,
     }
-    filename = f"mycal-export-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json"
+    filename = f"mycal-export-{exported_at.strftime('%Y%m%d-%H%M%S')}.json"
     content = json.dumps(payload, indent=2, ensure_ascii=False)
     return send_file(
         BytesIO(content.encode('utf-8')),
@@ -404,6 +420,13 @@ def _validate_color(raw_value: str | None) -> str:
     if any(char not in allowed for char in value[1:]):
         raise ValidationError('Choose a valid hex color.')
     return value.lower()
+
+
+def _parse_optional_color(raw_value: str | None) -> str | None:
+    value = (raw_value or '').strip()
+    if not value:
+        return None
+    return _validate_color(value)
 
 
 def _clone_event(source: Event) -> Event:
@@ -491,6 +514,10 @@ def _build_event_from_import(item):
         if any(day not in allowed_weekdays for day in weekdays):
             raise ValidationError(f'Event "{title}" has invalid recurrence weekdays.')
         recurrence_weekdays = ','.join(sorted(weekdays, key=int))
+    if recurrence_type == 'weekly' and not recurrence_weekdays:
+        raise ValidationError(f'Event "{title}" must include weekdays for weekly recurrence.')
+    if recurrence_type != 'weekly':
+        recurrence_weekdays = ''
 
     event = Event(
         title=title[:200],
@@ -502,6 +529,7 @@ def _build_event_from_import(item):
         location=((item.get('location') or '').strip() or None),
         audience=audience,
         notes=((item.get('notes') or '').strip() or None),
+        color=_parse_optional_color(item.get('color')),
         recurrence_type=recurrence_type,
         recurrence_weekdays=recurrence_weekdays or None,
     )

@@ -108,13 +108,17 @@ def build_week_metadata(grid: list[list[date]], month: int) -> list[CalendarWeek
             CalendarWeek(
                 index=index,
                 days=week_days,
-                label=f"{label_start.strftime('%b %-d')} – {label_end.strftime('%b %-d')}",
+                label=f'{_format_month_day(label_start)} - {_format_month_day(label_end)}',
                 includes_current_month=bool(in_month_days),
                 start_iso=week_days[0].isoformat(),
                 end_iso=week_days[-1].isoformat(),
             )
         )
     return weeks
+
+
+def _format_month_day(value: date) -> str:
+    return f'{value.strftime("%b")} {value.day}'
 
 
 def format_time(value: time | None) -> str | None:

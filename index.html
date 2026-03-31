@@ -61,6 +61,11 @@
                   <input type="range" class="form-range" id="lineThicknessInput" min="1" max="4" step="0.5" value="1">
                 </div>
                 <button type="button" class="btn btn-link btn-sm p-0" id="resetColorSettingsBtn">Reset defaults</button>
+                <div class="mt-3 pt-3 border-top">
+                  <div class="mb-2 fw-semibold small text-uppercase text-muted">Audience colors</div>
+                  <div class="small text-muted mb-2">Default event chip colors by audience.</div>
+                  <div class="audience-color-settings-list" id="audienceColorSettings"></div>
+                </div>
               </div>
             </div>
             <button class="btn btn-outline-primary btn-sm" type="button" id="printBtn">
@@ -177,13 +182,6 @@
                   </div>
                   <div class="d-flex flex-wrap gap-3" id="weekdayCheckboxes"></div>
                   <div class="form-text">Leave all unchecked for non-recurring events.</div>
-                </div>
-                <div class="col-md-12">
-                  <div class="border rounded p-2">
-                    <div class="small fw-semibold mb-2">Audience colors</div>
-                    <div class="small text-muted mb-2">Default colors are shown next to each audience name.</div>
-                    <div class="row g-2" id="audienceColorSettings"></div>
-                  </div>
                 </div>
                 <div class="col-md-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" id="notes" maxlength="5000"></textarea></div>
                 <div class="col-md-12">
