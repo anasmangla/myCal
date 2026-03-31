@@ -161,6 +161,9 @@
         <button class="btn btn-outline-success btn-sm" type="button" id="importJsonBtn">
           <i class="bi bi-upload me-1" aria-hidden="true"></i>Import JSON
         </button>
+        <button class="btn btn-help btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#helpModal">
+          <span class="help-pill">?</span>Help
+        </button>
       </div>
     </div>
   </div>
@@ -263,6 +266,94 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true" aria-labelledby="helpModalTitle">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content help-modal">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="helpModalTitle">How To Use myCal</h5>
+          <p class="text-muted small mb-0">A quick guide for planning, styling, sharing, and editing notes inside the calendar.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="help-grid">
+          <section class="help-card">
+            <h6>Calendar Basics</h6>
+            <ul class="help-list">
+              <li>Use the month selector at the top to switch months.</li>
+              <li>Use the Islamic date and U.S. holiday controls to show or hide those labels.</li>
+              <li>Click the month title to rename the calendar for that month.</li>
+              <li>Use `Settings` to change colors, fonts, title sizing, and audience colors.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Adding Events</h6>
+            <ul class="help-list">
+              <li>Double-click a regular in-month date cell to add an event quickly.</li>
+              <li>Click an event chip to edit it.</li>
+              <li>Leave `Start time` blank if the event should be treated as all-day.</li>
+              <li>Use the weekday checkboxes in the event form to repeat an event weekly.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Right-Click Actions</h6>
+            <ul class="help-list">
+              <li>Right-click a date cell to change its background color or hide holiday / Islamic labels for that day.</li>
+              <li>Right-click an event chip to modify, move, or remove that event.</li>
+              <li>Right-click a non-date box image to remove just that image.</li>
+              <li>Right-click a non-date box itself to add or clear images for that box.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Non-Date Boxes</h6>
+            <ul class="help-list">
+              <li>Double-click a non-date box to type directly inside the box.</li>
+              <li>Use the inline controls to change font family, font size, bold, and italic.</li>
+              <li>Text wraps automatically and stays inside the box with scroll support for longer notes.</li>
+              <li>Click outside the editor or press `Esc` to stop editing.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Images In Non-Date Boxes</h6>
+            <ul class="help-list">
+              <li>Drag an image file into a non-date box to add it.</li>
+              <li>Drag an existing thumbnail from one non-date box to another to move it.</li>
+              <li>Drag a thumbnail to the trash bar at the bottom of the screen to remove it.</li>
+              <li>You can also use the side panel image picker when a non-date box is selected.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Export And Sharing</h6>
+            <ul class="help-list">
+              <li>`Print / Save PDF` creates a printable month view.</li>
+              <li>`Export image` saves the visible calendar as an image.</li>
+              <li>`Export ICS` downloads the events that appear in the current month.</li>
+              <li>`Export JSON` and `Import JSON` let you back up or restore the calendar data.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Saved Data</h6>
+            <ul class="help-list">
+              <li>The static app saves changes locally in the browser.</li>
+              <li>The Flask app saves events and date styles to its database.</li>
+              <li>Importing JSON replaces the current calendar data in the destination app.</li>
+            </ul>
+          </section>
+          <section class="help-card">
+            <h6>Best Practices</h6>
+            <ul class="help-list">
+              <li>Keep event titles short so they fit better in printed cells.</li>
+              <li>Use audience colors consistently so readers can scan quickly.</li>
+              <li>Use non-date boxes for overflow notes, reminders, contacts, or announcements.</li>
+              <li>Export a PDF or image before sharing if you want recipients to see exactly what you see.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 </div>
