@@ -35,6 +35,28 @@ export async function removeImageFromCell({ state, date, attachmentId }) {
   await deleteAttachment(`attachment_${attachmentId}`);
 }
 
+export async function clearImagesFromCell({ state, date }) {
+  if (!date) return;
+  const cell = state.doc.cells[date];
+  if (!cell?.attachments?.length) return;
+  const attachmentIds = [...cell.attachments];
+  cell.attachments = [];
+  attachmentIds.forEach((attachmentId) => {
+    delete state.doc.attachments[attachmentId];
+  });
+  await Promise.all(attachmentIds.map((attachmentId) => deleteAttachment(`attachment_${attachmentId}`)));
+}
+
+export async function moveImageBetweenCells({ state, fromDate, toDate, attachmentId }) {
+  if (!fromDate || !toDate || !attachmentId || fromDate === toDate) return;
+  const sourceCell = state.doc.cells[fromDate];
+  if (!sourceCell?.attachments?.includes(attachmentId)) return;
+  const targetCell = ensureCell(state.doc, toDate);
+  sourceCell.attachments = sourceCell.attachments.filter((id) => id !== attachmentId);
+  if (!targetCell.attachments.includes(attachmentId)) targetCell.attachments.push(attachmentId);
+  if (state.doc.attachments[attachmentId]) state.doc.attachments[attachmentId].parentId = toDate;
+}
+
 export async function exportAttachmentsInline(doc) {
   const pairs = await Promise.all(Object.values(doc.attachments).map(async (meta) => [meta.id, await fileToDataUrl(dataUrlToFile(meta.thumbnailDataUrl, meta.name, meta.mimeType))]));
   return Object.fromEntries(pairs);

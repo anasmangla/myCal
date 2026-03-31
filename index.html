@@ -251,6 +251,8 @@
       <button class="dropdown-item" id="contextAddEvent">Add event</button>
       <button class="dropdown-item" id="contextChangeColor">Change date background color</button>
       <button class="dropdown-item" id="contextClearColor">Clear custom date background color</button>
+      <button class="dropdown-item d-none" id="contextAddCellImage">Add image to box</button>
+      <button class="dropdown-item d-none" id="contextRemoveCellImages">Remove box images</button>
       <button class="dropdown-item" id="contextToggleHoliday">Hide U.S. holiday on this day</button>
       <button class="dropdown-item" id="contextToggleIslamic">Hide Islamic date on this day</button>
     </div>
@@ -260,6 +262,10 @@
       <button class="dropdown-item text-danger" id="contextDeleteEvent">Remove event</button>
     </div>
     <input type="color" id="dateColorPicker" class="visually-hidden" value="#fef3c7">
+    <input type="file" id="contextCellImageInput" accept="image/*" class="d-none">
+    <div class="image-trash-dropzone d-none no-print" id="imageTrashDropzone" aria-hidden="true">
+      <div class="image-trash-dropzone-pill">Drop image here to remove it</div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app/static/js/static-app.js"></script>

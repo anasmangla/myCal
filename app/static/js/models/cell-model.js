@@ -9,6 +9,12 @@ export function ensureCell(doc, date) {
       contentType: 'plain',
       backgroundColor: null,
       textColor: null,
+      textStyle: {
+        fontPreset: 'system',
+        fontSize: 0.72,
+        fontWeight: '400',
+        italic: false,
+      },
       attachments: [],
       visibility: 'public',
       updatedAt: nowIso(),

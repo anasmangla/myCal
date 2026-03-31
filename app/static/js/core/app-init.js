@@ -8,9 +8,9 @@ import { flash } from '../ui/toasts.js';
 import { saveActiveMonth, getActiveMonth, getMeta } from '../storage/local-meta.js';
 import { loadDocument, schedulePersist, persistDocument } from '../storage/persistence.js';
 import { migrateLegacyState } from './migration.js';
-import { openCellEditor, saveCellFromPanel } from '../features/cell-editor.js';
+import { applyCellTextStylePatch, openCellEditor, saveCellFromPanel, updateCellText } from '../features/cell-editor.js';
 import { setCellColor } from '../features/cell-colors.js';
-import { addImageToCell, removeImageFromCell } from '../features/attachments.js';
+import { addImageToCell, clearImagesFromCell, moveImageBetweenCells, removeImageFromCell } from '../features/attachments.js';
 import { exportDocumentIcs, exportDocumentJson, parseImportJson } from '../features/import-export.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
@@ -19,6 +19,8 @@ import { searchDocument } from '../features/search.js';
 let eventModal;
 let activeDateContext = '';
 let activeEventContext = { eventId: '', occurrenceDate: '' };
+let pendingCellEditorFocus = false;
+let activeDraggedCellImage = null;
 const FONT_PRESETS = {
   system: '"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
   trebuchet: '"Trebuchet MS", "Segoe UI", sans-serif',
@@ -163,6 +165,7 @@ function rerender() {
     audienceColors: mergedAudienceColors(),
     onSelectDate: ({ date, inMonth }) => {
       appState.activeDate = date;
+      if (appState.editingCell && appState.editingCell !== date) appState.editingCell = null;
       if (!inMonth) openCellEditor({ state: appState, date });
       else document.getElementById('sidePanel').classList.add('d-none');
       rerender();
@@ -171,8 +174,23 @@ function rerender() {
     onOpenActions: (date) => openEventModal({ startDate: date, endDate: date }),
     onEditCellText: (date) => {
       appState.activeDate = date;
-      openCellEditor({ state: appState, date });
-      document.getElementById('cellNoteInput').focus();
+      appState.editingCell = date;
+      pendingCellEditorFocus = true;
+      document.getElementById('sidePanel').classList.add('d-none');
+      rerender();
+    },
+    onStopCellEdit: (date) => {
+      if (appState.editingCell !== date) return;
+      appState.editingCell = null;
+      rerender();
+    },
+    onCellTextInput: ({ date, value }) => {
+      updateCellText({ state: appState, date, value });
+      schedulePersist(appState.doc, 'cell-note-inline', setLastSaved);
+    },
+    onCellTextStyleChange: ({ date, patch }) => {
+      applyCellTextStylePatch({ state: appState, date, patch });
+      schedulePersist(appState.doc, 'cell-text-style', setLastSaved);
     },
     onDateContext: ({ date, x, y }) => {
       activeDateContext = date;
@@ -184,22 +202,51 @@ function rerender() {
       showMenu(document.getElementById('eventContextMenu'), x, y);
     },
     onMoveEvent: ({ eventId, targetDate, anchorDate }) => moveEvent(eventId, targetDate, anchorDate),
+    onMoveCellImage: async ({ fromDate, toDate, attachmentId }) => {
+      await moveImageBetweenCells({ state: appState, fromDate, toDate, attachmentId });
+      if (appState.editingCell === fromDate || appState.editingCell === toDate) pendingCellEditorFocus = true;
+      schedulePersist(appState.doc, 'attachment-move', setLastSaved);
+      rerender();
+    },
     onDropImage: async (date, files) => {
       const file = Array.from(files)[0];
       if (!file) return;
-      try { await addImageToCell({ state: appState, date, file }); schedulePersist(appState.doc, 'attachment', setLastSaved); rerender(); }
+      try {
+        appState.activeDate = date;
+        if (appState.editingCell === date) pendingCellEditorFocus = true;
+        await addImageToCell({ state: appState, date, file });
+        schedulePersist(appState.doc, 'attachment', setLastSaved);
+        rerender();
+      }
       catch (error) { flash(error.message, 'danger'); }
     },
     onRemoveImage: async ({ date, attachmentId }) => {
       const confirmed = window.confirm('Remove this image from the selected field?');
       if (!confirmed) return;
       await removeImageFromCell({ state: appState, date, attachmentId });
+      if (appState.editingCell === date) pendingCellEditorFocus = true;
       schedulePersist(appState.doc, 'attachment-remove', setLastSaved);
       rerender();
+    },
+    onStartCellImageDrag: ({ date, attachmentId }) => {
+      activeDraggedCellImage = { date, attachmentId };
+      toggleImageTrash(true);
+    },
+    onEndCellImageDrag: () => {
+      activeDraggedCellImage = null;
+      toggleImageTrash(false);
     },
   });
   renderUnscheduled();
   renderAudienceColorSettings();
+  if (pendingCellEditorFocus && appState.editingCell) {
+    const editor = document.querySelector(`[data-cell-editor="${appState.editingCell}"]`);
+    if (editor) {
+      editor.focus();
+      editor.setSelectionRange(editor.value.length, editor.value.length);
+    }
+  }
+  pendingCellEditorFocus = false;
 }
 
 function getThemeSettings() {
@@ -298,6 +345,22 @@ function hideMenus() {
   document.querySelectorAll('.context-menu').forEach((menu) => menu.classList.add('d-none'));
 }
 
+function toggleImageTrash(visible, active = false) {
+  const dropzone = document.getElementById('imageTrashDropzone');
+  if (!dropzone) return;
+  dropzone.classList.toggle('d-none', !visible);
+  dropzone.classList.toggle('is-active', Boolean(visible && active));
+}
+
+function parseDragPayload(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 function hiddenDateSet(type) {
   const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = { holidays: [], islamic: [] });
   const values = Array.isArray(hiddenMeta[type]) ? hiddenMeta[type] : [];
@@ -311,14 +374,24 @@ function setHiddenDateSet(type, values) {
 
 function updateDateContextLabels(date) {
   const addEventBtn = document.getElementById('contextAddEvent');
+  const addCellImageBtn = document.getElementById('contextAddCellImage');
+  const removeCellImagesBtn = document.getElementById('contextRemoveCellImages');
   const holidayBtn = document.getElementById('contextToggleHoliday');
   const islamicBtn = document.getElementById('contextToggleIslamic');
   const inVisibleMonth = !isOutsideVisibleMonth(date);
+  const outsideMonth = !inVisibleMonth;
   const holidayHidden = hiddenDateSet('holidays').has(date);
   const islamicHidden = hiddenDateSet('islamic').has(date);
+  const activeCell = appState.doc.cells[date];
+  const imageCount = activeCell?.attachments?.length || 0;
   addEventBtn.classList.toggle('d-none', !inVisibleMonth);
+  addCellImageBtn.classList.toggle('d-none', !outsideMonth);
+  removeCellImagesBtn.classList.toggle('d-none', !outsideMonth);
   holidayBtn.classList.toggle('d-none', !inVisibleMonth);
   islamicBtn.classList.toggle('d-none', !inVisibleMonth);
+  addCellImageBtn.disabled = !outsideMonth;
+  removeCellImagesBtn.disabled = !outsideMonth || imageCount === 0;
+  removeCellImagesBtn.textContent = imageCount > 1 ? 'Remove all box images' : 'Remove box image';
   holidayBtn.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
   islamicBtn.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
   holidayBtn.disabled = !inVisibleMonth || !appState.doc.settings.showUSHolidays;
@@ -434,12 +507,15 @@ async function loadOrCreateDoc(year, month) {
 
 function bindMainUI() {
   const dateColorPicker = document.getElementById('dateColorPicker');
+  const contextCellImageInput = document.getElementById('contextCellImageInput');
+  const imageTrashDropzone = document.getElementById('imageTrashDropzone');
   const monthYearSelect = document.getElementById('monthYearSelect');
 
   const applySelectedMonth = async () => {
     const [yearText, monthText] = monthYearSelect.value.split('-');
     appState.view.month = Number(monthText);
     appState.view.year = Number(yearText);
+    appState.editingCell = null;
     appState.doc = await loadOrCreateDoc(appState.view.year, appState.view.month);
     saveActiveMonth(monthIso(appState.view.year, appState.view.month));
     rerender();
@@ -562,6 +638,41 @@ function bindMainUI() {
     schedulePersist(appState.doc, 'cell-color-clear', setLastSaved);
     rerender();
   });
+  contextCellImageInput.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeDateContext || !isOutsideVisibleMonth(activeDateContext)) return;
+    try {
+      appState.activeDate = activeDateContext;
+      if (appState.editingCell === activeDateContext) pendingCellEditorFocus = true;
+      await addImageToCell({ state: appState, date: activeDateContext, file });
+      schedulePersist(appState.doc, 'attachment', setLastSaved);
+      rerender();
+    } catch (error) {
+      flash(error.message, 'danger');
+    } finally {
+      event.target.value = '';
+    }
+  });
+  imageTrashDropzone.addEventListener('dragover', (event) => {
+    if (!activeDraggedCellImage) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    toggleImageTrash(true, true);
+  });
+  imageTrashDropzone.addEventListener('dragleave', () => {
+    if (!activeDraggedCellImage) return;
+    toggleImageTrash(true, false);
+  });
+  imageTrashDropzone.addEventListener('drop', async (event) => {
+    const parsed = parseDragPayload(event.dataTransfer?.getData('text/plain'));
+    if (!parsed?.attachmentId || !parsed?.sourceDate) return;
+    event.preventDefault();
+    toggleImageTrash(false);
+    activeDraggedCellImage = null;
+    await removeImageFromCell({ state: appState, date: parsed.sourceDate, attachmentId: parsed.attachmentId });
+    schedulePersist(appState.doc, 'attachment-remove', setLastSaved);
+    rerender();
+  });
 
   document.getElementById('exportJsonBtn').addEventListener('click', () => exportDocumentJson(appState.doc));
   document.getElementById('exportIcsBtn').addEventListener('click', () => exportDocumentIcs(appState.doc));
@@ -612,6 +723,23 @@ function bindMainUI() {
     hideMenus();
     if (!activeDateContext) return;
     openEventModal({ startDate: activeDateContext, endDate: activeDateContext });
+  });
+  document.getElementById('contextAddCellImage').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext || !isOutsideVisibleMonth(activeDateContext)) return;
+    contextCellImageInput.click();
+  });
+  document.getElementById('contextRemoveCellImages').addEventListener('click', async () => {
+    hideMenus();
+    if (!activeDateContext || !isOutsideVisibleMonth(activeDateContext)) return;
+    const activeCell = appState.doc.cells[activeDateContext];
+    if (!activeCell?.attachments?.length) return;
+    const confirmed = window.confirm(activeCell.attachments.length > 1 ? 'Remove all images from this box?' : 'Remove this box image?');
+    if (!confirmed) return;
+    if (appState.editingCell === activeDateContext) pendingCellEditorFocus = true;
+    await clearImagesFromCell({ state: appState, date: activeDateContext });
+    schedulePersist(appState.doc, 'attachment-remove-all', setLastSaved);
+    rerender();
   });
   document.getElementById('contextChangeColor').addEventListener('click', () => {
     hideMenus();
@@ -670,9 +798,19 @@ function bindMainUI() {
   });
   document.addEventListener('click', (event) => {
     if (!event.target.closest('.context-menu')) hideMenus();
+    if (appState.editingCell && !event.target.closest('.outside-month-editor-shell')) {
+      appState.editingCell = null;
+      rerender();
+    }
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hideMenus();
+    if (event.key === 'Escape') {
+      hideMenus();
+      if (appState.editingCell) {
+        appState.editingCell = null;
+        rerender();
+      }
+    }
   });
   document.querySelectorAll('.context-menu').forEach((menu) => {
     menu.addEventListener('contextmenu', (event) => event.preventDefault());

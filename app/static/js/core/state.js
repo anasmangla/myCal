@@ -2,6 +2,7 @@ export const appState = {
   view: { year: 0, month: 0 },
   doc: null,
   activeDate: null,
+  editingCell: null,
   selectedCell: null,
   undoStack: [],
   redoStack: [],

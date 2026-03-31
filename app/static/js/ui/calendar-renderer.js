@@ -1,6 +1,7 @@
 import { buildMonthGrid, isoDate } from '../utils/dates.js';
 import { WEEKDAY_NAMES } from '../core/constants.js';
 import { visibleEventMap } from '../features/events.js';
+import { CELL_FONT_PRESET_OPTIONS, CELL_FONT_SIZE_OPTIONS, applyCellTextPresentation, getCellTextStyle } from '../features/cell-editor.js';
 import { previewText, escapeHtml } from '../utils/text.js';
 import { contrastTextColor } from '../utils/colors.js';
 
@@ -71,6 +72,27 @@ function simpleUSHolidays(year, month) {
   return map;
 }
 
+function fontPresetOptions(selected) {
+  return CELL_FONT_PRESET_OPTIONS
+    .map((option) => `<option value="${option.value}" ${option.value === selected ? 'selected' : ''}>${option.label}</option>`)
+    .join('');
+}
+
+function fontSizeOptions(selected) {
+  return CELL_FONT_SIZE_OPTIONS
+    .map((option) => `<option value="${option.value}" ${Number(option.value) === Number(selected) ? 'selected' : ''}>${option.label}</option>`)
+    .join('');
+}
+
+function parseDragPayload(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 export function renderCalendar({
   state,
   audienceColors,
@@ -78,11 +100,17 @@ export function renderCalendar({
   onOpenEvent,
   onOpenActions,
   onEditCellText,
+  onStopCellEdit,
+  onCellTextInput,
+  onCellTextStyleChange,
   onDateContext,
   onEventContext,
   onMoveEvent,
+  onMoveCellImage,
   onDropImage,
   onRemoveImage,
+  onStartCellImageDrag,
+  onEndCellImageDrag,
 }) {
   if (!weekdayBuilt) {
     const weekdayHeader = document.getElementById('weekdayHeader');
@@ -116,6 +144,8 @@ export function renderCalendar({
       const cellData = state.doc.cells[key];
       const rawText = cellData?.plainText || '';
       const preview = cellData?.contentType === 'rich-html' ? '' : previewText(rawText, inMonth ? 80 : 180);
+      const isEditingCell = !inMonth && state.editingCell === key;
+      const cellTextStyle = getCellTextStyle(cellData);
 
       const cell = document.createElement('div');
       cell.className = `calendar-cell day-cell ${inMonth ? '' : 'outside-month'}`;
@@ -136,7 +166,7 @@ export function renderCalendar({
       if (inMonth) {
         cell.innerHTML = `
           <div class="calendar-cell-header">
-            <button type="button" class="btn btn-sm btn-light date-action-btn no-print">⋮</button>
+            <button type="button" class="btn btn-sm btn-light date-action-btn no-print">...</button>
             <div class="day-number">${day.getUTCDate()}</div>
           </div>
           <div class="holiday-pill small"></div>
@@ -172,30 +202,48 @@ export function renderCalendar({
         cell.addEventListener('drop', (event) => {
           event.preventDefault();
           cell.classList.remove('drop-target');
-          const dragPayload = event.dataTransfer?.getData('text/plain');
-          if (dragPayload) {
-            try {
-              const parsed = JSON.parse(dragPayload);
-              if (parsed?.eventId && parsed?.anchorDate) {
-                onMoveEvent({ eventId: parsed.eventId, targetDate: key, anchorDate: parsed.anchorDate });
-                return;
-              }
-            } catch (error) {
-              // Fall through to image drop handling.
-            }
+          const parsed = parseDragPayload(event.dataTransfer?.getData('text/plain'));
+          if (parsed?.eventId && parsed?.anchorDate) {
+            onMoveEvent({ eventId: parsed.eventId, targetDate: key, anchorDate: parsed.anchorDate });
+            return;
           }
           onDropImage(key, event.dataTransfer?.files || []);
         });
       } else {
+        let outsideMonthClickTimer = 0;
         cell.innerHTML = `
           <div class="outside-month-fill extra-cell-fill">
-            <div class="cell-note-preview ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
+            ${isEditingCell ? `
+              <div class="outside-month-editor-shell" data-editor-shell="${key}">
+                <div class="outside-month-editor-toolbar no-print">
+                  <select class="form-select form-select-sm cell-style-select" data-style-control="fontPreset" aria-label="Text font">
+                    ${fontPresetOptions(cellTextStyle.fontPreset)}
+                  </select>
+                  <select class="form-select form-select-sm cell-style-select" data-style-control="fontSize" aria-label="Text size">
+                    ${fontSizeOptions(cellTextStyle.fontSize)}
+                  </select>
+                  <button type="button" class="btn btn-sm btn-outline-secondary cell-style-toggle ${cellTextStyle.fontWeight === '700' ? 'active' : ''}" data-style-toggle="bold" aria-pressed="${cellTextStyle.fontWeight === '700'}">B</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary cell-style-toggle ${cellTextStyle.italic ? 'active' : ''}" data-style-toggle="italic" aria-pressed="${cellTextStyle.italic}">I</button>
+                </div>
+                <textarea class="outside-month-editor" data-cell-editor="${key}" spellcheck="true" placeholder="Write directly in this box. Text wraps and stays inside the cell."></textarea>
+              </div>
+            ` : `
+              <div class="cell-note-preview cell-note-fit ${preview ? '' : 'd-none'}">${escapeHtml(preview)}</div>
+              <div class="outside-month-empty-hint ${preview || cellData?.attachments?.length ? 'd-none' : ''}">Double-click to type notes</div>
+            `}
             <div class="cell-image-strip"></div>
           </div>
         `;
         cell.tabIndex = 0;
-        cell.addEventListener('click', () => onSelectDate({ date: key, inMonth: false }));
-        cell.addEventListener('dblclick', () => onEditCellText(key));
+        cell.addEventListener('click', () => {
+          window.clearTimeout(outsideMonthClickTimer);
+          outsideMonthClickTimer = window.setTimeout(() => onSelectDate({ date: key, inMonth: false }), 180);
+        });
+        cell.addEventListener('dblclick', (event) => {
+          event.preventDefault();
+          window.clearTimeout(outsideMonthClickTimer);
+          onEditCellText(key);
+        });
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
@@ -208,8 +256,81 @@ export function renderCalendar({
         cell.addEventListener('drop', (event) => {
           event.preventDefault();
           cell.classList.remove('drop-target');
+          const parsed = parseDragPayload(event.dataTransfer?.getData('text/plain'));
+          if (parsed?.type === 'cell-image' && parsed?.attachmentId && parsed?.sourceDate && parsed.sourceDate !== key) {
+            onMoveCellImage({ fromDate: parsed.sourceDate, toDate: key, attachmentId: parsed.attachmentId });
+            return;
+          }
           onDropImage(key, event.dataTransfer?.files || []);
         });
+
+        if (isEditingCell) {
+          const shell = cell.querySelector('.outside-month-editor-shell');
+          const textarea = cell.querySelector('.outside-month-editor');
+          let liveTextStyle = { ...cellTextStyle };
+
+          textarea.value = rawText;
+          applyCellTextPresentation(textarea, { ...(cellData || {}), textStyle: liveTextStyle });
+
+          shell.addEventListener('click', (event) => event.stopPropagation());
+          shell.addEventListener('dblclick', (event) => event.stopPropagation());
+          shell.addEventListener('mousedown', (event) => event.stopPropagation());
+
+          textarea.addEventListener('input', () => {
+            onCellTextInput({ date: key, value: textarea.value });
+          });
+          textarea.addEventListener('contextmenu', (event) => {
+            event.stopPropagation();
+          });
+          textarea.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              onStopCellEdit(key);
+            }
+          });
+
+          const syncEditorStyle = () => {
+            applyCellTextPresentation(textarea, { ...(cellData || {}), textStyle: liveTextStyle });
+          };
+
+          shell.querySelector('[data-style-control="fontPreset"]').addEventListener('change', (event) => {
+            liveTextStyle = { ...liveTextStyle, fontPreset: event.target.value };
+            onCellTextStyleChange({ date: key, patch: { fontPreset: event.target.value } });
+            syncEditorStyle();
+          });
+          shell.querySelector('[data-style-control="fontSize"]').addEventListener('change', (event) => {
+            liveTextStyle = { ...liveTextStyle, fontSize: Number(event.target.value) };
+            onCellTextStyleChange({ date: key, patch: { fontSize: Number(event.target.value) } });
+            syncEditorStyle();
+          });
+          shell.querySelectorAll('[data-style-toggle]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (button.dataset.styleToggle === 'bold') {
+                const nextWeight = liveTextStyle.fontWeight === '700' ? '400' : '700';
+                liveTextStyle = { ...liveTextStyle, fontWeight: nextWeight };
+                onCellTextStyleChange({ date: key, patch: { fontWeight: nextWeight } });
+                button.classList.toggle('active', nextWeight === '700');
+                button.setAttribute('aria-pressed', String(nextWeight === '700'));
+              }
+              if (button.dataset.styleToggle === 'italic') {
+                const nextItalic = !liveTextStyle.italic;
+                liveTextStyle = { ...liveTextStyle, italic: nextItalic };
+                onCellTextStyleChange({ date: key, patch: { italic: nextItalic } });
+                button.classList.toggle('active', nextItalic);
+                button.setAttribute('aria-pressed', String(nextItalic));
+              }
+              syncEditorStyle();
+              textarea.focus();
+            });
+          });
+        } else {
+          const previewNode = cell.querySelector('.cell-note-preview');
+          if (previewNode) {
+            applyCellTextPresentation(previewNode, { ...(cellData || {}), textStyle: cellTextStyle });
+          }
+        }
       }
 
       const list = cell.querySelector('.event-list');
@@ -220,9 +341,9 @@ export function renderCalendar({
         chip.style.backgroundColor = item.color;
         chip.textContent = item.displayText;
         chip.title = item.title || item.displayText;
-        chip.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+        chip.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           if (item.sourceEventId) onOpenEvent(item.sourceEventId);
         });
         chip.addEventListener('dblclick', (event) => {
@@ -247,33 +368,42 @@ export function renderCalendar({
           event.dataTransfer.effectAllowed = 'move';
           event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.sourceEventId, anchorDate: item.occurrenceDate || key }));
         });
-        list.appendChild(chip);
+        list?.appendChild(chip);
       });
 
       if (cellData?.attachments?.length) {
         const strip = cell.querySelector('.cell-image-strip');
-        const attachIds = inMonth ? cellData.attachments.slice(0, 3) : cellData.attachments.slice(0, 1);
+        const attachIds = inMonth ? cellData.attachments.slice(0, 3) : cellData.attachments.slice(0, isEditingCell ? 4 : 2);
         attachIds.forEach((attId, index) => {
           const att = state.doc.attachments[attId];
           if (!att?.thumbnailDataUrl) return;
           const img = document.createElement('img');
           img.src = att.thumbnailDataUrl;
           img.alt = att.altText || att.name || 'Cell image';
-          img.className = index === 0 && !inMonth ? 'cell-thumb cell-thumb-primary' : 'cell-thumb';
+          img.className = index === 0 && !inMonth && !isEditingCell ? 'cell-thumb cell-thumb-primary' : 'cell-thumb';
+          img.dataset.attachmentId = attId;
+          img.addEventListener('click', (event) => event.stopPropagation());
           img.addEventListener('contextmenu', (event) => {
             event.preventDefault();
             event.stopPropagation();
             onRemoveImage({ date: key, attachmentId: attId });
           });
+          if (!inMonth) {
+            img.draggable = true;
+            img.addEventListener('dragstart', (event) => {
+              event.stopPropagation();
+              img.classList.add('is-dragging');
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', JSON.stringify({ type: 'cell-image', attachmentId: attId, sourceDate: key }));
+              onStartCellImageDrag({ date: key, attachmentId: attId });
+            });
+            img.addEventListener('dragend', () => {
+              img.classList.remove('is-dragging');
+              onEndCellImageDrag();
+            });
+          }
           strip.appendChild(img);
         });
-      }
-
-      if (!inMonth && preview) {
-        const previewNode = cell.querySelector('.cell-note-preview');
-        const length = rawText.trim().length;
-        previewNode.classList.add('cell-note-fit');
-        previewNode.classList.add(length <= 30 ? 'note-size-lg' : length <= 90 ? 'note-size-md' : 'note-size-sm');
       }
 
       if (inMonth) {

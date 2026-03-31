@@ -298,13 +298,17 @@ body {
 .outside-month-fill {
   min-height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .extra-cell-fill {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 0.2rem;
+  justify-content: flex-start;
+  padding: 0.25rem;
+  gap: 0.25rem;
 }
 
 .calendar-cell-header {
@@ -514,10 +518,110 @@ body {
 
 .cell-note-preview {
   margin-top: 0.2rem;
+  flex: 1 1 auto;
+  min-height: 0;
   font-size: var(--calendar-note-font-size);
   line-height: 1.2;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: hidden;
   color: #334155;
+}
+
+.outside-month-editor-shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.outside-month-editor-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.cell-style-select {
+  min-width: 0;
+  width: auto;
+  flex: 1 1 0;
+}
+
+.cell-style-toggle {
+  min-width: 2rem;
+  font-weight: 700;
+}
+
+.cell-style-toggle.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+}
+
+.outside-month-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.35rem 0.45rem;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: auto;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.outside-month-editor:focus {
+  outline: 2px solid rgba(15, 118, 110, 0.28);
+  outline-offset: 1px;
+}
+
+.outside-month-empty-hint {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.image-trash-dropzone {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 2600;
+}
+
+.image-trash-dropzone-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: rgba(127, 29, 29, 0.92);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.28);
+}
+
+.image-trash-dropzone.is-active .image-trash-dropzone-pill {
+  background: rgba(220, 38, 38, 0.96);
+  transform: scale(1.04);
 }
 
 .exporting-calendar .no-print {
