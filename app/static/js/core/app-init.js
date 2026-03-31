@@ -608,20 +608,6 @@ function bindMainUI() {
     });
   }
 
-  document.getElementById('undoBtn').addEventListener('click', () => {
-    const prev = appState.undoStack.pop();
-    if (!prev) return;
-    appState.redoStack.push(structuredClone(appState.doc));
-    appState.doc = prev;
-    rerender();
-  });
-  document.getElementById('redoBtn').addEventListener('click', () => {
-    const next = appState.redoStack.pop();
-    if (!next) return;
-    appState.undoStack.push(structuredClone(appState.doc));
-    appState.doc = next;
-    rerender();
-  });
   document.getElementById('contextAddEvent').addEventListener('click', () => {
     hideMenus();
     if (!activeDateContext) return;
