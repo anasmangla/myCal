@@ -118,7 +118,17 @@
                   <div class="settings-section-note">Set the default event chip color used for each audience.</div>
                   <div class="audience-color-settings-list mt-2" id="audienceColorSettings"></div>
                 </div>
-                <button type="button" class="btn btn-link btn-sm p-0 mt-3" id="resetSettingsBtn">Reset defaults</button>
+                <div class="settings-section">
+                  <div class="fw-semibold small text-uppercase text-muted">Visibility and sharing</div>
+                  <div class="settings-section-note">Restore hidden month items or open a share-ready guide for WhatsApp, email, and device sharing.</div>
+                  <div class="settings-actions mt-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="openHiddenItemsBtn" data-bs-toggle="modal" data-bs-target="#hiddenItemsModal">Hidden items</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="restoreHiddenItemsBtn">Restore all hidden items</button>
+                    <button type="button" class="btn btn-outline-info btn-sm" id="openShareGuideBtn" data-bs-toggle="modal" data-bs-target="#shareModal">Open share guide</button>
+                  </div>
+                  <div class="small text-muted mt-2" id="hiddenItemsSummary">Nothing hidden for this month.</div>
+                </div>
+                <button type="button" class="btn btn-link btn-sm p-0 mt-3" id="resetSettingsBtn">Reset appearance defaults</button>
               </div>
             </div>
             <button class="btn btn-outline-primary btn-sm" type="button" id="printBtn">
@@ -129,6 +139,9 @@
             </button>
             <button class="btn btn-outline-success btn-sm" type="button" id="exportIcsBtn">
               <i class="bi bi-calendar2-event me-1" aria-hidden="true"></i>Export ICS
+            </button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#shareModal" id="shareBtn">
+              <i class="bi bi-share me-1" aria-hidden="true"></i>Share
             </button>
             <button class="btn btn-outline-success btn-sm" type="button" id="exportJsonBtn">
               <i class="bi bi-filetype-json me-1" aria-hidden="true"></i>Export JSON
@@ -215,7 +228,13 @@
             </div>
             <div class="modal-body">
               <input type="hidden" id="eventId">
+              <input type="hidden" id="editScopeMode" value="all">
+              <input type="hidden" id="editSourceEventId" value="">
+              <input type="hidden" id="editOccurrenceDate" value="">
               <div class="row g-3">
+                <div class="col-12 d-none" id="eventScopeBanner">
+                  <div class="alert alert-info small mb-0" id="eventScopeBannerText"></div>
+                </div>
                 <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="title" maxlength="200" required></div>
                 <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" id="startDate" required></div>
                 <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" id="endDate" required></div>
@@ -274,15 +293,16 @@
                   <li>Leave <code>USA Jamaat</code>, <code>Islamic dates</code>, and <code>U.S. holidays</code> on or off depending on what you want to display.</li>
                   <li>Double-click any in-month date cell to add an event.</li>
                   <li>Double-click any non-date box to type notes directly into that box.</li>
-                  <li>Open <code>Settings</code> to adjust colors, fonts, sizes, and audience colors.</li>
-                  <li>Use <code>Print / Save PDF</code>, <code>Export image</code>, <code>Export ICS</code>, or <code>Export JSON</code> when you are ready to share or back up the month.</li>
+                  <li>Open <code>Settings</code> to adjust colors, fonts, sizes, audience colors, hidden items, and sharing helpers.</li>
+                  <li>Use <code>Print / Save PDF</code>, <code>Export image</code>, <code>Export ICS</code>, <code>Share</code>, or <code>Export JSON</code> when you are ready to share or back up the month.</li>
                 </ul>
               </section>
               <section class="help-card">
                 <h6>Top Bar And Toggles</h6>
                 <ul class="help-list">
                   <li>The month selector changes the active calendar month and updates the page title and browser tab title.</li>
-                  <li><code>Settings</code> controls calendar colors, grid lines, typography, and audience chip colors.</li>
+                  <li><code>Settings</code> controls calendar colors, grid lines, typography, audience chip colors, hidden item restore, and sharing helpers.</li>
+                  <li><code>Share</code> opens a month-specific message you can copy into WhatsApp, email, or your phone's share sheet.</li>
                   <li><code>USA Jamaat</code> shows or hides the built-in 2026 USA Jamaat feed for the selected month. It is on by default.</li>
                   <li><code>Islamic dates</code> shows or hides Islamic date labels inside day cells.</li>
                   <li><code>U.S. holidays</code> shows or hides federal holidays.</li>
@@ -295,8 +315,9 @@
                   <li>The USA Jamaat events come from the built-in 2026 national Jamaat calendar data saved with the app.</li>
                   <li>Only the events that fall within the currently selected month are shown.</li>
                   <li>These Jamaat items are read-only feed entries, not normal user-created events.</li>
-                  <li>Right-click a USA Jamaat event chip and choose remove to hide that occurrence on that day.</li>
-                  <li>Hidden Jamaat occurrences are stored locally for that month on your current browser.</li>
+                  <li>USA Jamaat event chips use a distinct visual style so they are easier to spot among your own events.</li>
+                  <li>Right-click or long-press a USA Jamaat event chip and choose remove to hide that occurrence on that day, or hide the full series for multi-day Jamaat events.</li>
+                  <li>Hidden Jamaat occurrences and hidden Jamaat series are stored locally for that month on your current browser.</li>
                   <li>Turn the <code>USA Jamaat</code> toggle off if you want to hide the full Jamaat feed for the selected month.</li>
                 </ul>
               </section>
@@ -307,6 +328,7 @@
                   <li>Leave <code>Start time</code> blank if the event should be treated as all-day.</li>
                   <li>Use the weekday checkboxes in the event form to repeat an event weekly.</li>
                   <li>Click or double-click one of your own event chips to edit it.</li>
+                  <li>When you edit, move, or delete a recurring or multi-day event, the app asks whether to affect only the selected date or the entire series.</li>
                   <li>Drag one of your own event chips to another in-month day cell to move it.</li>
                   <li>Use short titles and optional notes/location so chips stay readable in the calendar grid.</li>
                 </ul>
@@ -315,8 +337,8 @@
                 <h6>Right-Click Actions</h6>
                 <ul class="help-list">
                   <li>Right-click a date cell to change its background color or hide holiday / Islamic labels for that day.</li>
-                  <li>Right-click one of your own event chips to modify, move, or remove that event.</li>
-                  <li>Right-click a USA Jamaat event chip to hide only that day's occurrence.</li>
+                  <li>Right-click or long-press one of your own event chips to modify, move, or remove that event.</li>
+                  <li>Right-click or long-press a USA Jamaat event chip to hide only that day's occurrence or the full multi-day series.</li>
                   <li>Right-click a non-date box image to remove just that image.</li>
                   <li>Right-click a non-date box itself to add or clear images for that box.</li>
                 </ul>
@@ -346,6 +368,7 @@
                   <li><code>Print / Save PDF</code> creates a printable month snapshot.</li>
                   <li><code>Export image</code> saves the visible calendar as an image.</li>
                   <li><code>Export ICS</code> downloads the events visible in the current month, including USA Jamaat events when that toggle is on.</li>
+                  <li><code>Share</code> gives you a month-aware message for WhatsApp, email, or the device share sheet and reminds you which file type to attach.</li>
                   <li>An ICS file is a snapshot export. If you change the calendar later, recipients will need a new file to get the updated month.</li>
                   <li><code>Export JSON</code> and <code>Import JSON</code> let you back up or restore the saved month data.</li>
                 </ul>
@@ -354,7 +377,8 @@
                 <h6>Saved Data</h6>
                 <ul class="help-list">
                   <li>Your static calendar changes are saved locally in the browser.</li>
-                  <li>Font settings, colors, hidden labels, and hidden USA Jamaat occurrences are also saved locally.</li>
+                  <li>Font settings, colors, hidden labels, hidden Jamaat occurrences, and hidden Jamaat series are also saved locally.</li>
+                  <li>Use the hidden items tools in <code>Settings</code> if you want to review and restore anything you hid for this month.</li>
                   <li><code>Reset saved data</code> clears the saved local month data for the static app.</li>
                   <li>If you import JSON, the imported month replaces the current loaded document.</li>
                   <li>If browser storage is cleared or you switch devices, local static data does not follow automatically.</li>
@@ -372,6 +396,67 @@
               </section>
             </div>
             <p class="text-muted small mt-3 mb-0">This calendar was created by Anas Mangla. I can be reached at anas.mangla@gmail.com.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="hiddenItemsModal" tabindex="-1" aria-hidden="true" aria-labelledby="hiddenItemsModalTitle">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content hidden-items-modal">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="hiddenItemsModalTitle">Hidden Items For This Month</h5>
+              <p class="text-muted small mb-0">Restore any hidden holiday labels, Islamic dates, USA Jamaat occurrences, or USA Jamaat series for the selected month.</p>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted small mb-3" id="hiddenItemsModalSummary">Nothing hidden for this month.</p>
+            <div class="hidden-items-list" id="hiddenItemsList"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="restoreAllHiddenItemsBtn">Restore all hidden items</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true" aria-labelledby="shareModalTitle">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content share-modal">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="shareModalTitle">Share This Month</h5>
+              <p class="text-muted small mb-0">Use this guide with PDF, image, or ICS exports when sharing the current month with others.</p>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="share-card mb-3">
+              <div class="small text-uppercase text-muted fw-semibold mb-2">Recommended message</div>
+              <textarea class="form-control share-message-preview" id="shareMessagePreview" rows="5" readonly></textarea>
+            </div>
+            <div class="share-guide-grid">
+              <section class="share-card">
+                <h6>Which File To Attach</h6>
+                <ul class="help-list">
+                  <li>Attach an <code>ICS</code> file if recipients should import the visible month's events into their own calendars.</li>
+                  <li>Attach a <code>PDF</code> or <code>image</code> if you want them to see the exact calendar layout.</li>
+                  <li>If <code>USA Jamaat</code> is on, those events are included in the export for the current month.</li>
+                </ul>
+              </section>
+              <section class="share-card">
+                <h6>Share Actions</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="copyShareMessageBtn">Copy message</button>
+                  <button type="button" class="btn btn-outline-success btn-sm" id="copyWhatsappMessageBtn">Copy WhatsApp text</button>
+                  <button type="button" class="btn btn-outline-info btn-sm" id="nativeShareBtn">Use device share</button>
+                  <a class="btn btn-outline-success btn-sm" id="openWhatsappShareLink" href="https://wa.me/" target="_blank" rel="noopener">Open WhatsApp text</a>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </div>

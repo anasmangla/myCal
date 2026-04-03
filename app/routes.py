@@ -148,17 +148,32 @@ def save_event():
     form = request.form
     try:
         payload = parse_event_form(form)
+        edit_mode = (form.get('edit_mode') or 'all').strip().lower()
+        source_event_id = form.get('source_event_id', type=int)
+        occurrence_raw = form.get('occurrence_date')
+        source_event = None
+        occurrence_day = None
         month_bounds = _return_month_bounds()
         if month_bounds is not None:
             month_start, month_end = month_bounds
             if payload.start_date < month_start or payload.end_date > month_end:
                 raise ValidationError('Event dates for add/edit must stay within the current month.')
 
-        event = db.session.get(Event, payload.event_id) if payload.event_id else Event()
-        if payload.event_id and event is None:
-            raise ValidationError('The event you tried to edit no longer exists.')
-        if not payload.event_id:
+        if edit_mode == 'single' and source_event_id:
+            source_event = db.session.get(Event, source_event_id)
+            if source_event is None:
+                raise ValidationError('The event you tried to edit no longer exists.')
+            occurrence_day = _parse_day(occurrence_raw)
+            if not _supports_single_occurrence_delete(source_event) or not _is_valid_occurrence_date(source_event, occurrence_day):
+                raise ValidationError('The selected event date could not be edited.')
+            event = Event()
             db.session.add(event)
+        else:
+            event = db.session.get(Event, payload.event_id) if payload.event_id else Event()
+            if payload.event_id and event is None:
+                raise ValidationError('The event you tried to edit no longer exists.')
+            if not payload.event_id:
+                db.session.add(event)
 
         event.title = payload.title
         event.start_date = payload.start_date
@@ -178,8 +193,11 @@ def save_event():
         for offset, label_text in payload.labels.items():
             db.session.add(EventDayLabel(event_id=event.id, day_offset=offset, label=label_text))
 
+        if source_event is not None and occurrence_day is not None:
+            _delete_single_occurrence(source_event, occurrence_day)
+
         db.session.commit()
-        flash('Event saved successfully.', 'success')
+        flash('Event saved successfully.' if source_event is None else 'Selected event date saved as a standalone event.', 'success')
     except ValidationError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
@@ -235,14 +253,15 @@ def move_event(event_id: int):
         target_date = _parse_day(request.form.get('target_date'))
         anchor_raw = request.form.get('anchor_date')
         anchor_date = _parse_day(anchor_raw) if anchor_raw else event.start_date
+        move_mode = (request.form.get('move_mode') or 'all').strip().lower()
     except ValidationError as exc:
         flash(str(exc), 'danger')
         return redirect(_return_url())
 
     month_bounds = _return_month_bounds()
-    if event.recurrence_type != 'none' and anchor_raw:
-        if not _is_valid_occurrence_date(event, anchor_date):
-            flash('The selected recurring occurrence could not be moved.', 'danger')
+    if move_mode == 'single' and anchor_raw:
+        if not _supports_single_occurrence_delete(event) or not _is_valid_occurrence_date(event, anchor_date):
+            flash('The selected event date could not be moved.', 'danger')
             return redirect(_return_url())
         if month_bounds is not None:
             month_start, month_end = month_bounds
@@ -250,17 +269,12 @@ def move_event(event_id: int):
                 flash('Moved event must stay within the current month.', 'danger')
                 return redirect(_return_url())
 
-        moved_event = _clone_event(event)
-        moved_event.start_date = target_date
-        moved_event.end_date = target_date
-        moved_event.recurrence_type = 'none'
-        moved_event.recurrence_weekdays = None
-        moved_event.day_labels = []
+        moved_event = _standalone_occurrence_event(event, target_date)
         db.session.add(moved_event)
 
         _delete_single_occurrence(event, anchor_date)
         db.session.commit()
-        flash('Recurring occurrence moved as a standalone event.', 'success')
+        flash('Selected event date moved as a standalone event.', 'success')
         return redirect(_return_url())
 
     delta_days = (target_date - anchor_date).days
@@ -486,6 +500,16 @@ def _clone_event(source: Event) -> Event:
         EventDayLabel(day_offset=label.day_offset, label=label.label)
         for label in source.day_labels
     ]
+    return duplicate
+
+
+def _standalone_occurrence_event(source: Event, target_date: date) -> Event:
+    duplicate = _clone_event(source)
+    duplicate.start_date = target_date
+    duplicate.end_date = target_date
+    duplicate.recurrence_type = 'none'
+    duplicate.recurrence_weekdays = None
+    duplicate.day_labels = []
     return duplicate
 
 

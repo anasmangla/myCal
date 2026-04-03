@@ -148,7 +148,17 @@
                 {% endfor %}
               </div>
             </div>
-            <button type="button" class="btn btn-link btn-sm p-0 mt-3" id="resetSettingsBtn">Reset defaults</button>
+            <div class="settings-section">
+              <div class="fw-semibold small text-uppercase text-muted">Visibility and sharing</div>
+              <div class="settings-section-note">Restore hidden month items or open a share-ready guide for WhatsApp, email, and device sharing.</div>
+              <div class="settings-actions mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="openHiddenItemsBtn" data-bs-toggle="modal" data-bs-target="#hiddenItemsModal">Hidden items</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="restoreHiddenItemsBtn">Restore all hidden items</button>
+                <button type="button" class="btn btn-outline-info btn-sm" id="openShareGuideBtn" data-bs-toggle="modal" data-bs-target="#shareModal">Open share guide</button>
+              </div>
+              <div class="small text-muted mt-2" id="hiddenItemsSummary">Nothing hidden for this month.</div>
+            </div>
+            <button type="button" class="btn btn-link btn-sm p-0 mt-3" id="resetSettingsBtn">Reset appearance defaults</button>
           </div>
         </div>
         <button class="btn btn-outline-primary btn-sm" type="button" data-print-mode="month">
@@ -160,6 +170,9 @@
         <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_ics', month_year=selected_month_year, holidays=1 if include_holidays else 0, usa_jamaat=1 if include_usa_jamaat else 0) }}">
           <i class="bi bi-calendar2-event me-1" aria-hidden="true"></i>Export ICS
         </a>
+        <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#shareModal" id="shareBtn">
+          <i class="bi bi-share me-1" aria-hidden="true"></i>Share
+        </button>
         <a class="btn btn-outline-success btn-sm" href="{{ url_for('calendar.export_data') }}">
           <i class="bi bi-download me-1" aria-hidden="true"></i>Export JSON
         </a>
@@ -234,12 +247,18 @@
         </div>
         <div class="modal-body">
           <input type="hidden" name="event_id" id="eventId">
+          <input type="hidden" name="source_event_id" id="editSourceEventId" value="">
+          <input type="hidden" name="edit_mode" id="editScopeMode" value="all">
+          <input type="hidden" name="occurrence_date" id="editOccurrenceDate" value="">
           <input type="hidden" name="return_year" value="{{ selected_year }}">
           <input type="hidden" name="return_month" value="{{ selected_month }}">
           <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
           <input type="hidden" name="return_islamic" value="{{ islamic_mode }}">
           <input type="hidden" name="return_usa_jamaat" value="{{ 1 if include_usa_jamaat else 0 }}">
           <div class="row g-3">
+            <div class="col-12 d-none" id="eventScopeBanner">
+              <div class="alert alert-info small mb-0" id="eventScopeBannerText"></div>
+            </div>
             <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" name="title" id="title" maxlength="200" required></div>
             <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" id="startDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
             <div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" id="endDate" min="{{ selected_month_start }}" max="{{ selected_month_end }}" required></div>
@@ -295,15 +314,16 @@
               <li>Use the top toggles to decide whether <code>USA Jamaat</code>, <code>Islamic dates</code>, and <code>U.S. holidays</code> are visible.</li>
               <li>Double-click an in-month day cell to create a new event.</li>
               <li>Click or double-click one of your own event chips to edit it.</li>
-              <li>Open <code>Settings</code> to adjust colors, fonts, sizes, and audience colors.</li>
-              <li>Use <code>Print / Save PDF</code>, <code>Export image</code>, <code>Export ICS</code>, or <code>Export JSON</code> when you are ready to share or back up the month.</li>
+              <li>Open <code>Settings</code> to adjust colors, fonts, sizes, audience colors, hidden items, and sharing helpers.</li>
+              <li>Use <code>Print / Save PDF</code>, <code>Export image</code>, <code>Export ICS</code>, <code>Share</code>, or <code>Export JSON</code> when you are ready to share or back up the month.</li>
             </ul>
           </section>
           <section class="help-card">
             <h6>Top Bar And Toggles</h6>
             <ul class="help-list">
               <li>The month selector changes the active month and updates the browser tab title.</li>
-              <li><code>Settings</code> controls colors, grid lines, typography, and audience chip colors.</li>
+              <li><code>Settings</code> controls colors, grid lines, typography, audience chip colors, hidden item restore, and sharing helpers.</li>
+              <li><code>Share</code> opens a month-specific message you can copy into WhatsApp, email, or your phone's share sheet.</li>
               <li><code>USA Jamaat</code> shows or hides the built-in 2026 USA Jamaat feed for the selected month. It is on by default.</li>
               <li><code>Islamic dates</code> controls the Islamic date labels shown inside day cells.</li>
               <li><code>U.S. holidays</code> shows or hides federal holidays.</li>
@@ -316,8 +336,9 @@
               <li>The USA Jamaat events come from the built-in 2026 national Jamaat calendar data saved with the app.</li>
               <li>Only the events that fall within the currently selected month are shown.</li>
               <li>These Jamaat items are read-only feed entries, not normal user-created events.</li>
-              <li>Right-click a USA Jamaat event chip and choose remove to hide that occurrence on that day.</li>
-              <li>Hidden Jamaat occurrences are remembered locally for that month in your current browser.</li>
+              <li>USA Jamaat event chips use a distinct visual style so they are easier to spot among your own events.</li>
+              <li>Right-click or long-press a USA Jamaat event chip and choose remove to hide that occurrence on that day, or hide the full series for multi-day Jamaat events.</li>
+              <li>Hidden Jamaat occurrences and hidden Jamaat series are remembered locally for that month in your current browser.</li>
               <li>Turn the <code>USA Jamaat</code> toggle off if you want to hide the full Jamaat feed for the selected month.</li>
             </ul>
           </section>
@@ -328,6 +349,7 @@
               <li>Leave <code>Start time</code> blank if the event should be treated as all-day.</li>
               <li>Use the weekday checkboxes in the event form to repeat an event weekly.</li>
               <li>Click or double-click one of your own event chips to edit it.</li>
+              <li>When you edit, move, or delete a recurring or multi-day event, the app asks whether to affect only the selected date or the entire series.</li>
               <li>Drag one of your own event chips to another in-month day cell to move it.</li>
               <li>Use short titles and optional notes/location so chips stay readable in the calendar grid.</li>
             </ul>
@@ -336,8 +358,8 @@
             <h6>Right-Click Actions</h6>
             <ul class="help-list">
               <li>Right-click a date cell to change its background color or hide holiday / Islamic labels for that day.</li>
-              <li>Right-click one of your own event chips to modify, move, or remove that event.</li>
-              <li>Right-click a USA Jamaat event chip to hide only that day's occurrence.</li>
+              <li>Right-click or long-press one of your own event chips to modify, move, or remove that event.</li>
+              <li>Right-click or long-press a USA Jamaat event chip to hide only that day's occurrence or the full multi-day series.</li>
               <li>The remove action on a Jamaat chip hides that occurrence instead of editing the underlying feed.</li>
             </ul>
           </section>
@@ -347,6 +369,7 @@
               <li><code>Print / Save PDF</code> creates a printable month snapshot.</li>
               <li><code>Export image</code> saves the visible calendar as an image.</li>
               <li><code>Export ICS</code> downloads the events visible in the current month, including USA Jamaat events when that toggle is on.</li>
+              <li><code>Share</code> gives you a month-aware message for WhatsApp, email, or the device share sheet and reminds you which file type to attach.</li>
               <li>An ICS file is a snapshot export. If you change the calendar later, recipients will need a new file to get the updated month.</li>
               <li><code>Export JSON</code> and <code>Import JSON</code> let you back up or restore the calendar data.</li>
             </ul>
@@ -355,7 +378,8 @@
             <h6>Saved Data</h6>
             <ul class="help-list">
               <li>The Flask app saves events and date styles to its database.</li>
-              <li>Hidden holiday labels, hidden Islamic labels, and hidden USA Jamaat occurrences are remembered locally in this browser for the current month.</li>
+              <li>Hidden holiday labels, hidden Islamic labels, hidden USA Jamaat occurrences, and hidden USA Jamaat series are remembered locally in this browser for the current month.</li>
+              <li>Use the hidden items tools in <code>Settings</code> if you want to review and restore anything you hid for this month.</li>
               <li>Importing JSON replaces the current calendar data in the destination app.</li>
               <li>If you use another browser or device, local hide/show choices do not follow automatically.</li>
             </ul>
@@ -372,6 +396,65 @@
           </section>
         </div>
         <p class="text-muted small mt-3 mb-0">This calendar was created by Anas Mangla. I can be reached at anas.mangla@gmail.com.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="hiddenItemsModal" tabindex="-1" aria-hidden="true" aria-labelledby="hiddenItemsModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content hidden-items-modal">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="hiddenItemsModalTitle">Hidden Items For This Month</h5>
+          <p class="text-muted small mb-0">Restore any hidden holiday labels, Islamic dates, USA Jamaat occurrences, or USA Jamaat series for the selected month.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3" id="hiddenItemsModalSummary">Nothing hidden for this month.</p>
+        <div class="hidden-items-list" id="hiddenItemsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="restoreAllHiddenItemsBtn">Restore all hidden items</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true" aria-labelledby="shareModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content share-modal">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="shareModalTitle">Share This Month</h5>
+          <p class="text-muted small mb-0">Use this guide with PDF, image, or ICS exports when sharing the current month with others.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="share-card mb-3">
+          <div class="small text-uppercase text-muted fw-semibold mb-2">Recommended message</div>
+          <textarea class="form-control share-message-preview" id="shareMessagePreview" rows="5" readonly></textarea>
+        </div>
+        <div class="share-guide-grid">
+          <section class="share-card">
+            <h6>Which File To Attach</h6>
+            <ul class="help-list">
+              <li>Attach an <code>ICS</code> file if recipients should import the visible month's events into their own calendars.</li>
+              <li>Attach a <code>PDF</code> or <code>image</code> if you want them to see the exact calendar layout.</li>
+              <li>If <code>USA Jamaat</code> is on, those events are included in the export for the current month.</li>
+            </ul>
+          </section>
+          <section class="share-card">
+            <h6>Share Actions</h6>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="copyShareMessageBtn">Copy message</button>
+              <button type="button" class="btn btn-outline-success btn-sm" id="copyWhatsappMessageBtn">Copy WhatsApp text</button>
+              <button type="button" class="btn btn-outline-info btn-sm" id="nativeShareBtn">Use device share</button>
+              <a class="btn btn-outline-success btn-sm" id="openWhatsappShareLink" href="https://wa.me/" target="_blank" rel="noopener">Open WhatsApp text</a>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </div>
@@ -405,6 +488,7 @@
   <input type="hidden" name="return_usa_jamaat" value="{{ 1 if include_usa_jamaat else 0 }}">
   <input type="hidden" name="target_date" id="eventActionTargetDate">
   <input type="hidden" name="anchor_date" id="eventActionAnchorDate">
+  <input type="hidden" name="move_mode" id="eventActionMoveMode" value="all">
 </form>
 <form method="post" action="{{ url_for('calendar.import_data') }}" id="importDataForm" class="d-none" enctype="multipart/form-data">
   <input type="hidden" name="return_year" value="{{ selected_year }}">

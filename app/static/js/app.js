@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const legacyRemToPt = 12;
   const audienceColors = loadAudienceColors();
+  const monthDateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const eventModalEl = document.getElementById('eventModal');
   const eventModal = new bootstrap.Modal(eventModalEl);
   const eventForm = document.getElementById('eventForm');
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventActionForm = document.getElementById('eventActionForm');
   const eventActionTargetDate = document.getElementById('eventActionTargetDate');
   const eventActionAnchorDate = document.getElementById('eventActionAnchorDate');
+  const eventActionMoveMode = document.getElementById('eventActionMoveMode');
   const titleDisplay = document.getElementById('calendarTitleDisplay');
   const titleInput = document.getElementById('calendarTitleInput');
   const nonDateColorInput = document.getElementById('nonDateColorInput');
@@ -67,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const eventFontSizeInput = document.getElementById('eventFontSizeInput');
   const eventFontSizeValue = document.getElementById('eventFontSizeValue');
   const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+  const editScopeModeInput = document.getElementById('editScopeMode');
+  const editSourceEventIdInput = document.getElementById('editSourceEventId');
+  const editOccurrenceDateInput = document.getElementById('editOccurrenceDate');
+  const eventScopeBanner = document.getElementById('eventScopeBanner');
+  const eventScopeBannerText = document.getElementById('eventScopeBannerText');
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
@@ -102,6 +109,40 @@ document.addEventListener('DOMContentLoaded', () => {
   setupContextMenus();
   setupFormBehavior();
   setupEventDragAndDrop();
+  updateShareUI();
+  renderHiddenItemsUI();
+
+  document.getElementById('hiddenItemsModal')?.addEventListener('show.bs.modal', () => {
+    renderHiddenItemsUI();
+  });
+  document.getElementById('shareModal')?.addEventListener('show.bs.modal', () => {
+    updateShareUI();
+  });
+  document.getElementById('restoreHiddenItemsBtn')?.addEventListener('click', () => {
+    restoreAllHiddenItems();
+  });
+  document.getElementById('restoreAllHiddenItemsBtn')?.addEventListener('click', () => {
+    restoreAllHiddenItems();
+  });
+  document.getElementById('copyShareMessageBtn')?.addEventListener('click', async () => {
+    const copied = await copyText(currentShareMessage());
+    if (!copied) showValidation('Could not copy the share message right now.');
+  });
+  document.getElementById('copyWhatsappMessageBtn')?.addEventListener('click', async () => {
+    const copied = await copyText(currentShareMessage());
+    if (!copied) showValidation('Could not copy the WhatsApp text right now.');
+  });
+  document.getElementById('nativeShareBtn')?.addEventListener('click', async () => {
+    if (typeof navigator.share !== 'function') return;
+    try {
+      await navigator.share({ title: browserTabTitle(), text: currentShareMessage() });
+    } catch (error) {
+      if (error?.name !== 'AbortError') showValidation('Could not open the device share sheet.');
+    }
+  });
+  eventModalEl?.addEventListener('hidden.bs.modal', () => {
+    resetScopedEditState();
+  });
 
   function clearSelectedEvent() {
     activeEventId = null;
@@ -121,6 +162,216 @@ document.addEventListener('DOMContentLoaded', () => {
     activeEventSeriesKey = seriesKey;
     activeEventSeriesSpanDays = seriesSpanDays || 1;
     activeEventTitle = title;
+  }
+
+  function formatMonthDate(iso) {
+    if (!iso) return '';
+    return monthDateFormatter.format(new Date(`${iso}T00:00:00Z`));
+  }
+
+  function currentShareMessage() {
+    const monthLabel = browserTabTitle();
+    const includesUsaJamaat = data.includeUsaJamaat;
+    return [
+      `Here is the ${monthLabel} myCal calendar.`,
+      `If I attach an ICS file, download it and open it with your calendar app to add this month's events${includesUsaJamaat ? ' including visible USA Jamaat items' : ''}.`,
+      'If I attach a PDF or image, that file is the visual month snapshot.',
+    ].join(' ');
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      const fallback = document.createElement('textarea');
+      fallback.value = text;
+      fallback.setAttribute('readonly', '');
+      fallback.style.position = 'fixed';
+      fallback.style.opacity = '0';
+      document.body.appendChild(fallback);
+      fallback.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(fallback);
+      return copied;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setScopedEditBanner(message = '') {
+    if (!eventScopeBanner || !eventScopeBannerText) return;
+    eventScopeBannerText.textContent = message;
+    eventScopeBanner.classList.toggle('d-none', !message);
+  }
+
+  function resetScopedEditState() {
+    if (editScopeModeInput) editScopeModeInput.value = 'all';
+    if (editSourceEventIdInput) editSourceEventIdInput.value = '';
+    if (editOccurrenceDateInput) editOccurrenceDateInput.value = '';
+    setScopedEditBanner('');
+  }
+
+  function supportsScopedAction(details, occurrenceDate) {
+    if (!details || !occurrenceDate) return false;
+    const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
+    const isMultiDay = getSpanDays(details.start_date, details.end_date) > 1;
+    if (!isRecurring && !isMultiDay) return false;
+    return occurrenceDate >= details.start_date && occurrenceDate <= details.end_date;
+  }
+
+  function askActionScope(details, actionVerb) {
+    const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
+    const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
+    const affectSelectedDate = window.confirm(
+      `${intro}\n\nPress OK to ${actionVerb} only the selected date.\nPress Cancel to choose whether to ${actionVerb} the entire series.`
+    );
+    if (affectSelectedDate) return 'single';
+    const affectSeries = window.confirm(`${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} the entire series?`);
+    return affectSeries ? 'all' : '';
+  }
+
+  function buildSingleOccurrenceDraft(details, occurrenceDate) {
+    return {
+      ...details,
+      id: '',
+      start_date: occurrenceDate,
+      end_date: occurrenceDate,
+      recurrence_type: 'none',
+      recurrence_weekdays: '',
+      labels: {},
+    };
+  }
+
+  function flattenEventItems() {
+    return Object.values(data.events || {}).flatMap((items) => items || []);
+  }
+
+  function hiddenItemEntries() {
+    const entries = [];
+    const allItems = flattenEventItems();
+    const usaBySeries = new Map();
+    allItems.filter((item) => item.is_usa_jamaat && item.series_key).forEach((item) => {
+      if (!usaBySeries.has(item.series_key)) usaBySeries.set(item.series_key, item);
+    });
+
+    Array.from(hiddenMeta.holidays).forEach((iso) => {
+      entries.push({
+        type: 'holidays',
+        key: iso,
+        sortKey: `0-${iso}`,
+        title: data.holidays[iso] || 'U.S. holiday',
+        meta: `Hidden U.S. holiday on ${formatMonthDate(iso)}`,
+      });
+    });
+
+    Array.from(hiddenMeta.islamic).forEach((iso) => {
+      entries.push({
+        type: 'islamic',
+        key: iso,
+        sortKey: `1-${iso}`,
+        title: islamicLabelForDate(iso) || 'Islamic date',
+        meta: `Hidden Islamic date on ${formatMonthDate(iso)}`,
+      });
+    });
+
+    Array.from(hiddenMeta.usaJamaatOccurrences).forEach((occurrenceKey) => {
+      const item = allItems.find((entry) => entry.is_usa_jamaat && entry.occurrence_key === occurrenceKey);
+      const occurrenceDate = item?.date || String(occurrenceKey).split('@')[1] || '';
+      entries.push({
+        type: 'usaJamaatOccurrences',
+        key: occurrenceKey,
+        sortKey: `2-${occurrenceDate}-${item?.title || occurrenceKey}`,
+        title: item?.title || 'USA Jamaat event',
+        meta: `Hidden USA Jamaat occurrence on ${formatMonthDate(occurrenceDate)}`,
+      });
+    });
+
+    Array.from(hiddenMeta.usaJamaatSeries).forEach((seriesKey) => {
+      const item = usaBySeries.get(seriesKey);
+      const startDate = item?.occurrence_key?.split('@')[1] || item?.date || '';
+      entries.push({
+        type: 'usaJamaatSeries',
+        key: seriesKey,
+        sortKey: `3-${startDate}-${item?.title || seriesKey}`,
+        title: item?.title || 'USA Jamaat series',
+        meta: `Hidden USA Jamaat series${startDate ? ` starting ${formatMonthDate(startDate)}` : ''}`,
+      });
+    });
+
+    return entries.sort((left, right) => left.sortKey.localeCompare(right.sortKey));
+  }
+
+  function removeHiddenItem(type, key) {
+    if (!hiddenMeta[type]) return;
+    hiddenMeta[type].delete(key);
+    persistHiddenMeta();
+  }
+
+  function restoreAllHiddenItems() {
+    [hiddenMeta.holidays, hiddenMeta.islamic, hiddenMeta.usaJamaatOccurrences, hiddenMeta.usaJamaatSeries].forEach((values) => values.clear());
+    persistHiddenMeta();
+    renderCalendarDecorations();
+    renderHiddenItemsUI();
+  }
+
+  function renderHiddenItemsUI() {
+    const entries = hiddenItemEntries();
+    const summaryText = entries.length
+      ? `${entries.length} hidden item${entries.length === 1 ? '' : 's'} in ${browserTabTitle()}.`
+      : 'Nothing hidden for this month.';
+    const summary = document.getElementById('hiddenItemsSummary');
+    const modalSummary = document.getElementById('hiddenItemsModalSummary');
+    const list = document.getElementById('hiddenItemsList');
+    const restoreBtn = document.getElementById('restoreHiddenItemsBtn');
+    const restoreAllBtn = document.getElementById('restoreAllHiddenItemsBtn');
+
+    if (summary) summary.textContent = summaryText;
+    if (modalSummary) modalSummary.textContent = summaryText;
+    if (restoreBtn) restoreBtn.disabled = entries.length === 0;
+    if (restoreAllBtn) restoreAllBtn.disabled = entries.length === 0;
+    if (!list) return;
+
+    if (!entries.length) {
+      list.innerHTML = '<div class="hidden-item-card empty-state">Nothing is hidden for this month.</div>';
+      return;
+    }
+
+    list.innerHTML = entries.map((entry, index) => `
+      <div class="hidden-item-card">
+        <div class="hidden-item-body">
+          <div class="hidden-item-title">${escapeHtml(entry.title)}</div>
+          <div class="hidden-item-meta">${escapeHtml(entry.meta)}</div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-hidden-type="${entry.type}" data-hidden-key="${entry.key}" aria-label="Restore hidden item ${index + 1}">Restore</button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-hidden-type][data-hidden-key]').forEach((button) => {
+      button.addEventListener('click', () => {
+        removeHiddenItem(button.dataset.hiddenType, button.dataset.hiddenKey);
+        renderCalendarDecorations();
+        renderHiddenItemsUI();
+      });
+    });
+  }
+
+  function updateShareUI() {
+    const preview = document.getElementById('shareMessagePreview');
+    const nativeShareBtn = document.getElementById('nativeShareBtn');
+    const whatsappLink = document.getElementById('openWhatsappShareLink');
+    const shareMessage = currentShareMessage();
+
+    if (preview) preview.value = shareMessage;
+    if (whatsappLink) whatsappLink.href = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    if (nativeShareBtn) nativeShareBtn.classList.toggle('d-none', typeof navigator.share !== 'function');
   }
 
   document.querySelectorAll('.date-action-btn').forEach((button) => {
@@ -187,6 +438,11 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
       activeDate = cell.dataset.date;
       showMenu(dateMenu, event.pageX, event.pageY);
+    });
+    bindLongPress(cell, ({ x, y }) => {
+      activeDate = cell.dataset.date;
+      if (!cell.querySelector('.event-chip:hover')) clearSelectedEvent();
+      showMenu(dateMenu, x, y);
     });
   });
 
@@ -329,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (item.is_usa_jamaat && item.series_key && isHiddenMeta('usaJamaatSeries', item.series_key)) return;
         if (item.is_usa_jamaat && item.occurrence_key && isHiddenMeta('usaJamaatOccurrences', item.occurrence_key)) return;
         const chip = document.createElement('a');
-        chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
+        chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''} ${item.is_usa_jamaat ? 'usa-jamaat-chip' : ''}`.trim();
         chip.textContent = item.display_text;
         chip.style.backgroundColor = (item.uses_custom_color || item.is_holiday || item.is_usa_jamaat)
           ? item.color
@@ -387,6 +643,21 @@ document.addEventListener('DOMContentLoaded', () => {
           syncEventMenuLabels();
           showMenu(eventMenu, event.pageX, event.pageY);
         });
+        bindLongPress(chip, ({ x, y }) => {
+          if (item.is_holiday) return;
+          if (item.source_type === 'user' && !item.source_event_id) return;
+          selectEvent({
+            eventId: item.source_event_id || null,
+            occurrenceDate: date,
+            sourceType: item.source_type || 'user',
+            occurrenceKey: item.occurrence_key || '',
+            seriesKey: item.series_key || '',
+            seriesSpanDays: item.series_span_days || 1,
+            title: item.title || '',
+          });
+          syncEventMenuLabels();
+          showMenu(eventMenu, x, y);
+        });
         chip.addEventListener('dragstart', (event) => {
           if (item.is_holiday || !item.source_event_id || item.source_type !== 'user') return;
           selectEvent({
@@ -440,6 +711,55 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${ordinal(islamic.day)} of ${islamic.month}`;
   }
 
+  function bindLongPress(target, onTrigger) {
+    if (!target) return;
+
+    let timerId = 0;
+    let pointerId = null;
+    let startX = 0;
+    let startY = 0;
+
+    const cancel = () => {
+      if (timerId) {
+        window.clearTimeout(timerId);
+        timerId = 0;
+      }
+      pointerId = null;
+    };
+
+    target.addEventListener('pointerdown', (event) => {
+      if ((event.pointerType || 'mouse') === 'mouse' || event.button !== 0) return;
+      startX = event.pageX;
+      startY = event.pageY;
+      pointerId = event.pointerId;
+      timerId = window.setTimeout(() => {
+        timerId = 0;
+        target.dataset.longPressHandled = 'true';
+        onTrigger({ x: startX, y: startY });
+      }, 420);
+    });
+
+    target.addEventListener('pointermove', (event) => {
+      if (pointerId == null || event.pointerId !== pointerId) return;
+      if (Math.abs(event.pageX - startX) > 10 || Math.abs(event.pageY - startY) > 10) cancel();
+    });
+
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+      target.addEventListener(eventName, (event) => {
+        if (pointerId == null || (event.pointerId != null && event.pointerId !== pointerId)) return;
+        cancel();
+      });
+    });
+
+    target.addEventListener('click', (event) => {
+      if (target.dataset.longPressHandled === 'true') {
+        delete target.dataset.longPressHandled;
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  }
+
   function setupEventDragAndDrop() {
     document.querySelectorAll('.calendar-cell[data-in-month="true"]').forEach((cell) => {
       cell.addEventListener('dragenter', (event) => {
@@ -482,11 +802,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.calendar-cell.drop-target').forEach((cell) => cell.classList.remove('drop-target'));
   }
 
-  function submitMoveEvent(eventId, targetDate, anchorDate) {
+  async function submitMoveEvent(eventId, targetDate, anchorDate) {
     if (!eventId || !targetDate) return;
+    let moveMode = 'all';
+    const details = await fetchEventDetails(eventId);
+    const occurrenceDate = anchorDate || details?.start_date || '';
+    if (supportsScopedAction(details, occurrenceDate)) {
+      moveMode = askActionScope(details, 'move');
+      if (!moveMode) return;
+    }
     eventActionForm.action = `/events/move/${eventId}`;
     eventActionTargetDate.value = targetDate;
     eventActionAnchorDate.value = anchorDate || '';
+    if (eventActionMoveMode) eventActionMoveMode.value = moveMode;
     eventActionForm.submit();
   }
 
@@ -496,7 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await openEventById(activeEventId, activeEventOccurrenceDate || '');
   });
 
-  document.getElementById('contextMoveEvent').addEventListener('click', () => {
+  document.getElementById('contextMoveEvent').addEventListener('click', async () => {
     hideMenus();
     if (activeEventSourceType !== 'user' || !activeEventId) return;
 
@@ -507,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showValidation('Please enter the new date in YYYY-MM-DD format.');
       return;
     }
-    submitMoveEvent(activeEventId, nextStart, activeEventOccurrenceDate || '');
+    await submitMoveEvent(activeEventId, nextStart, activeEventOccurrenceDate || '');
   });
 
   function applyDateStyles() {
@@ -874,8 +1202,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function openEventModal(payload, occurrenceDate = '') {
-    const candidateStartDate = payload.start_date || payload.startDate || '';
-    const candidateEndDate = payload.end_date || payload.endDate || candidateStartDate;
+    resetScopedEditState();
+    const requestedOccurrenceDate = occurrenceDate || payload.start_date || payload.startDate || '';
+    let scopedPayload = payload;
+
+    if (payload.id && supportsScopedAction(payload, requestedOccurrenceDate)) {
+      const editMode = askActionScope(payload, 'edit');
+      if (!editMode) return;
+      if (editMode === 'single') {
+        scopedPayload = buildSingleOccurrenceDraft(payload, requestedOccurrenceDate);
+        if (editSourceEventIdInput) editSourceEventIdInput.value = String(payload.id);
+        if (editScopeModeInput) editScopeModeInput.value = 'single';
+        if (editOccurrenceDateInput) editOccurrenceDateInput.value = requestedOccurrenceDate;
+        setScopedEditBanner(`Editing only ${formatMonthDate(requestedOccurrenceDate)}. Saving will create a standalone event and remove that date from the original series.`);
+      }
+    }
+
+    const candidateStartDate = scopedPayload.start_date || scopedPayload.startDate || '';
+    const candidateEndDate = scopedPayload.end_date || scopedPayload.endDate || candidateStartDate;
     if (
       (candidateStartDate && !isSelectableDate(candidateStartDate))
       || (candidateEndDate && !isSelectableDate(candidateEndDate))
@@ -886,24 +1230,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     eventForm.reset();
     validationEl.classList.add('d-none');
-    document.getElementById('eventId').value = payload.id || '';
-    document.getElementById('title').value = payload.title || '';
-    document.getElementById('startDate').value = payload.start_date || payload.startDate || '';
-    document.getElementById('endDate').value = payload.end_date || payload.endDate || payload.start_date || '';
-    document.getElementById('startTime').value = payload.start_time || '';
-    document.getElementById('location').value = payload.location || '';
-    document.getElementById('audience').value = payload.audience || 'Unspecified';
+    document.getElementById('eventId').value = scopedPayload.id || '';
+    document.getElementById('title').value = scopedPayload.title || '';
+    document.getElementById('startDate').value = scopedPayload.start_date || scopedPayload.startDate || '';
+    document.getElementById('endDate').value = scopedPayload.end_date || scopedPayload.endDate || scopedPayload.start_date || '';
+    document.getElementById('startTime').value = scopedPayload.start_time || '';
+    document.getElementById('location').value = scopedPayload.location || '';
+    document.getElementById('audience').value = scopedPayload.audience || 'Unspecified';
     const eventColorField = document.getElementById('eventColor');
-    eventColorField.dataset.touched = payload.color ? 'true' : 'false';
-    eventColorField.value = payload.color || colorForAudience(document.getElementById('audience').value);
-    document.getElementById('notes').value = payload.notes || '';
+    eventColorField.dataset.touched = scopedPayload.color ? 'true' : 'false';
+    eventColorField.value = scopedPayload.color || colorForAudience(document.getElementById('audience').value);
+    document.getElementById('notes').value = scopedPayload.notes || '';
     document.querySelectorAll('input[name="recurrence_weekdays"]').forEach((checkbox) => {
-      checkbox.checked = (payload.recurrence_weekdays || '').split(',').includes(checkbox.value);
+      checkbox.checked = (scopedPayload.recurrence_weekdays || '').split(',').includes(checkbox.value);
     });
     syncRecurrenceType();
-    syncRecurringEndDate(Boolean(payload.id));
-    buildDayLabels(payload.labels || {});
-    document.getElementById('deleteEventBtn').dataset.occurrenceDate = occurrenceDate || candidateStartDate || '';
+    syncRecurringEndDate(Boolean(scopedPayload.id));
+    buildDayLabels(scopedPayload.labels || {});
+    const deleteButton = document.getElementById('deleteEventBtn');
+    if (deleteButton) {
+      deleteButton.classList.toggle('d-none', !scopedPayload.id);
+      deleteButton.dataset.occurrenceDate = requestedOccurrenceDate || candidateStartDate || '';
+    }
     eventModal.show();
   }
 
@@ -1220,6 +1568,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCalendarDecorations() {
     applyDateStyles();
     renderEvents();
+    renderHiddenItemsUI();
   }
 
   const deleteEventBtn = document.getElementById('deleteEventBtn');

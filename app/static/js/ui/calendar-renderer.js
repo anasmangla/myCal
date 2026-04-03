@@ -8,6 +8,7 @@ import { contrastTextColor } from '../utils/colors.js';
 
 let weekdayBuilt = false;
 const islamicFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-tbla', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+const LONG_PRESS_DELAY_MS = 420;
 const islamicMonthNameMap = {
   Muharram: 'Muharram',
   Safar: 'Safar',
@@ -42,7 +43,7 @@ function ordinal(day) {
   return `${day}th`;
 }
 
-function buildIslamicLabels(iso) {
+export function buildIslamicLabels(iso) {
   const islamic = getIslamicParts(iso);
   const isFirstGregorian = iso.endsWith('-01');
   const isFirstIslamic = islamic.day === 1;
@@ -50,7 +51,7 @@ function buildIslamicLabels(iso) {
   return [{ text: `${ordinal(islamic.day)} of ${islamic.month}`, italic: true, important: false }];
 }
 
-function simpleUSHolidays(year, month) {
+export function simpleUSHolidays(year, month) {
   const map = new Map();
   const pushHoliday = (date, label) => {
     const holidayMonth = date.getUTCMonth() + 1;
@@ -95,6 +96,55 @@ function simpleUSHolidays(year, month) {
   fixedHoliday(12, 25, 'Christmas Day');
   lastWeekday(5, 1, 'Memorial Day');
   return map;
+}
+
+function bindLongPress(target, onTrigger) {
+  if (!target) return;
+
+  let timerId = 0;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+
+  const cancel = () => {
+    if (timerId) {
+      window.clearTimeout(timerId);
+      timerId = 0;
+    }
+    pointerId = null;
+  };
+
+  target.addEventListener('pointerdown', (event) => {
+    if ((event.pointerType || 'mouse') === 'mouse' || event.button !== 0) return;
+    startX = event.pageX;
+    startY = event.pageY;
+    pointerId = event.pointerId;
+    timerId = window.setTimeout(() => {
+      timerId = 0;
+      target.dataset.longPressHandled = 'true';
+      onTrigger({ x: startX, y: startY });
+    }, LONG_PRESS_DELAY_MS);
+  });
+
+  target.addEventListener('pointermove', (event) => {
+    if (pointerId == null || event.pointerId !== pointerId) return;
+    if (Math.abs(event.pageX - startX) > 10 || Math.abs(event.pageY - startY) > 10) cancel();
+  });
+
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+    target.addEventListener(eventName, (event) => {
+      if (pointerId == null || (event.pointerId != null && event.pointerId !== pointerId)) return;
+      cancel();
+    });
+  });
+
+  target.addEventListener('click', (event) => {
+    if (target.dataset.longPressHandled === 'true') {
+      delete target.dataset.longPressHandled;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
 }
 
 function fontPresetOptions(selected) {
@@ -221,6 +271,10 @@ export function renderCalendar({
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
         });
+        bindLongPress(cell, ({ x, y }) => {
+          onSelectDate({ date: key, inMonth: true });
+          onDateContext({ date: key, x, y });
+        });
         cell.querySelector('.date-action-btn').addEventListener('click', (event) => {
           event.stopPropagation();
           onOpenActions(key, event);
@@ -277,6 +331,10 @@ export function renderCalendar({
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           onDateContext({ date: key, x: event.pageX, y: event.pageY });
+        });
+        bindLongPress(cell, ({ x, y }) => {
+          onSelectDate({ date: key, inMonth: false });
+          onDateContext({ date: key, x, y });
         });
         cell.addEventListener('dragover', (event) => {
           event.preventDefault();
@@ -367,7 +425,7 @@ export function renderCalendar({
       (events[key] || []).forEach((item) => {
         const chip = document.createElement('a');
         chip.href = '#';
-        chip.className = `event-chip ${item.isHoliday ? 'holiday-chip' : ''}`;
+        chip.className = `event-chip ${item.isHoliday ? 'holiday-chip' : ''} ${item.isUsaJamaat ? 'usa-jamaat-chip' : ''}`.trim();
         chip.style.backgroundColor = item.color;
         chip.textContent = item.displayText;
         chip.title = item.title || item.displayText;
@@ -400,6 +458,21 @@ export function renderCalendar({
             title: item.title || item.displayText,
             x: event.pageX,
             y: event.pageY,
+          });
+        });
+        bindLongPress(chip, ({ x, y }) => {
+          if (item.isHoliday) return;
+          if (item.sourceType === 'user' && !item.sourceEventId) return;
+          onEventContext({
+            eventId: item.sourceEventId,
+            sourceType: item.sourceType || 'user',
+            occurrenceDate: item.occurrenceDate || key,
+            occurrenceKey: item.occurrenceKey || '',
+            seriesKey: item.seriesKey || '',
+            seriesSpanDays: item.seriesSpanDays || 1,
+            title: item.title || item.displayText,
+            x,
+            y,
           });
         });
         chip.draggable = Boolean(item.sourceType === 'user' && item.sourceEventId && !item.isHoliday);

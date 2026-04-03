@@ -3,7 +3,7 @@ import { appState, pushUndo } from './state.js';
 import { firstVisibleMonth, monthIso } from '../utils/dates.js';
 import { createDocumentForView } from '../models/document-model.js';
 import { normalizeEvent } from '../models/event-model.js';
-import { renderCalendar } from '../ui/calendar-renderer.js';
+import { renderCalendar, buildIslamicLabels, simpleUSHolidays } from '../ui/calendar-renderer.js';
 import { flash } from '../ui/toasts.js';
 import { saveActiveMonth, getActiveMonth, getMeta } from '../storage/local-meta.js';
 import { loadDocument, schedulePersist, persistDocument } from '../storage/persistence.js';
@@ -16,6 +16,7 @@ import { getSpanDays } from '../features/events.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
 import { searchDocument } from '../features/search.js';
+import { USA_JAMAAT_EVENTS_2026 } from '../data/usa-jamaat-calendar-2026.js';
 
 let eventModal;
 let activeDateContext = '';
@@ -30,6 +31,8 @@ const FONT_PRESETS = {
   verdana: 'Verdana, Geneva, sans-serif',
 };
 const LEGACY_REM_TO_PT = 12;
+const monthDateFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const usaJamaatSeriesLookup = new Map(USA_JAMAAT_EVENTS_2026.map((event) => [event.id, event]));
 const defaultThemeSettings = {
   outsideMonthColor: '#f5f5f5',
   weekendHolidayColor: '#d9d9d9',
@@ -105,6 +108,204 @@ function syncTitle() {
   document.title = browserTabTitle(appState.view.year, appState.view.month);
 }
 
+function formatMonthDate(iso) {
+  if (!iso) return '';
+  return monthDateFormatter.format(new Date(`${iso}T00:00:00Z`));
+}
+
+function currentShareMessage() {
+  const monthLabel = browserTabTitle(appState.view.year, appState.view.month);
+  const includesUsaJamaat = appState.doc.settings.showUsaJamaat !== false;
+  return [
+    `Here is the ${monthLabel} myCal calendar.`,
+    `If I attach an ICS file, download it and open it with your calendar app to add this month's events${includesUsaJamaat ? ' including visible USA Jamaat items' : ''}.`,
+    'If I attach a PDF or image, that file is the visual month snapshot.',
+  ].join(' ');
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    const fallback = document.createElement('textarea');
+    fallback.value = text;
+    fallback.setAttribute('readonly', '');
+    fallback.style.position = 'fixed';
+    fallback.style.opacity = '0';
+    document.body.appendChild(fallback);
+    fallback.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(fallback);
+    return copied;
+  }
+}
+
+function setEventScopeBanner(message = '') {
+  const banner = document.getElementById('eventScopeBanner');
+  const text = document.getElementById('eventScopeBannerText');
+  if (!banner || !text) return;
+  text.textContent = message;
+  banner.classList.toggle('d-none', !message);
+}
+
+function resetEventScopeState() {
+  document.getElementById('editScopeMode').value = 'all';
+  document.getElementById('editSourceEventId').value = '';
+  document.getElementById('editOccurrenceDate').value = '';
+  setEventScopeBanner('');
+}
+
+function supportsScopedAction(event, occurrenceDate) {
+  if (!event || !occurrenceDate) return false;
+  const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
+  const isMultiDay = eventSpanDays(event) > 1;
+  return (isRecurring || isMultiDay) && eventOccursOnDate(event, occurrenceDate);
+}
+
+function askSeriesActionMode(event, actionVerb) {
+  const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
+  const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
+  const affectSelectedDate = window.confirm(
+    `${intro}\n\nPress OK to ${actionVerb} only the selected date.\nPress Cancel to choose whether to ${actionVerb} the entire series.`
+  );
+  if (affectSelectedDate) return 'single';
+  const affectSeries = window.confirm(`${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} the entire series?`);
+  return affectSeries ? 'all' : '';
+}
+
+function buildSingleOccurrenceDraft(event, occurrenceDate) {
+  return normalizeEvent({
+    ...event,
+    id: '',
+    startDate: occurrenceDate,
+    endDate: occurrenceDate,
+    recurrenceType: 'none',
+    recurrenceWeekdays: [],
+    labels: {},
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function hiddenItemEntries() {
+  const hiddenMeta = appState.doc.settings.hiddenMeta || {};
+  const holidayMap = simpleUSHolidays(appState.view.year, appState.view.month);
+  const entries = [];
+
+  (hiddenMeta.holidays || []).forEach((iso) => {
+    entries.push({
+      type: 'holidays',
+      key: iso,
+      sortKey: `0-${iso}`,
+      title: holidayMap.get(iso) || 'U.S. holiday',
+      meta: `Hidden U.S. holiday on ${formatMonthDate(iso)}`,
+    });
+  });
+
+  (hiddenMeta.islamic || []).forEach((iso) => {
+    const islamicLabel = buildIslamicLabels(iso)[0]?.text || 'Islamic date';
+    entries.push({
+      type: 'islamic',
+      key: iso,
+      sortKey: `1-${iso}`,
+      title: islamicLabel,
+      meta: `Hidden Islamic date on ${formatMonthDate(iso)}`,
+    });
+  });
+
+  (hiddenMeta.usaJamaatOccurrences || []).forEach((occurrenceKey) => {
+    const [seriesId, occurrenceDate] = String(occurrenceKey).split('@');
+    const series = usaJamaatSeriesLookup.get(seriesId);
+    entries.push({
+      type: 'usaJamaatOccurrences',
+      key: occurrenceKey,
+      sortKey: `2-${occurrenceDate || seriesId}-${series?.title || occurrenceKey}`,
+      title: series?.title || 'USA Jamaat event',
+      meta: `Hidden USA Jamaat occurrence on ${formatMonthDate(occurrenceDate)}${series?.location ? ` • ${series.location}` : ''}`,
+    });
+  });
+
+  (hiddenMeta.usaJamaatSeries || []).forEach((seriesKey) => {
+    const series = usaJamaatSeriesLookup.get(String(seriesKey));
+    entries.push({
+      type: 'usaJamaatSeries',
+      key: String(seriesKey),
+      sortKey: `3-${series?.startDate || seriesKey}-${series?.title || seriesKey}`,
+      title: series?.title || 'USA Jamaat series',
+      meta: `Hidden USA Jamaat series${series?.startDate ? ` starting ${formatMonthDate(series.startDate)}` : ''}${series?.endDate && series.endDate !== series.startDate ? ` through ${formatMonthDate(series.endDate)}` : ''}`,
+    });
+  });
+
+  return entries.sort((left, right) => left.sortKey.localeCompare(right.sortKey));
+}
+
+function removeHiddenItem(type, key) {
+  const values = hiddenDateSet(type);
+  values.delete(key);
+  setHiddenDateSet(type, values);
+}
+
+function restoreAllHiddenItems() {
+  if (hiddenItemEntries().length === 0) return;
+  ['holidays', 'islamic', 'usaJamaatOccurrences', 'usaJamaatSeries'].forEach((type) => setHiddenDateSet(type, new Set()));
+  schedulePersist(appState.doc, 'hidden-items-restore', setLastSaved);
+  rerender();
+  flash('Hidden items restored for this month.');
+}
+
+function renderHiddenItemsUI() {
+  const entries = hiddenItemEntries();
+  const summaryText = entries.length
+    ? `${entries.length} hidden item${entries.length === 1 ? '' : 's'} in ${browserTabTitle(appState.view.year, appState.view.month)}.`
+    : 'Nothing hidden for this month.';
+  const summary = document.getElementById('hiddenItemsSummary');
+  const modalSummary = document.getElementById('hiddenItemsModalSummary');
+  const list = document.getElementById('hiddenItemsList');
+  const restoreBtn = document.getElementById('restoreHiddenItemsBtn');
+  const restoreAllBtn = document.getElementById('restoreAllHiddenItemsBtn');
+
+  if (summary) summary.textContent = summaryText;
+  if (modalSummary) modalSummary.textContent = summaryText;
+  if (restoreBtn) restoreBtn.disabled = entries.length === 0;
+  if (restoreAllBtn) restoreAllBtn.disabled = entries.length === 0;
+  if (!list) return;
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="hidden-item-card empty-state">Nothing is hidden for this month.</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map((entry, index) => `
+    <div class="hidden-item-card">
+      <div class="hidden-item-body">
+        <div class="hidden-item-title">${entry.title}</div>
+        <div class="hidden-item-meta">${entry.meta}</div>
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" data-hidden-type="${entry.type}" data-hidden-key="${entry.key}" aria-label="Restore hidden item ${index + 1}">Restore</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-hidden-type][data-hidden-key]').forEach((button) => {
+    button.addEventListener('click', () => {
+      removeHiddenItem(button.dataset.hiddenType, button.dataset.hiddenKey);
+      schedulePersist(appState.doc, 'hidden-item-restore', setLastSaved);
+      rerender();
+      flash('Hidden item restored.');
+    });
+  });
+}
+
+function updateShareUI() {
+  const preview = document.getElementById('shareMessagePreview');
+  const nativeShareBtn = document.getElementById('nativeShareBtn');
+  const whatsappLink = document.getElementById('openWhatsappShareLink');
+  const shareMessage = currentShareMessage();
+
+  if (preview) preview.value = shareMessage;
+  if (whatsappLink) whatsappLink.href = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+  if (nativeShareBtn) nativeShareBtn.classList.toggle('d-none', typeof navigator.share !== 'function');
+}
+
 function fillSelects() {
   const now = new Date();
   const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -175,6 +376,8 @@ function renderUnscheduled() {
 
 function rerender() {
   syncTitle();
+  updateShareUI();
+  renderHiddenItemsUI();
   syncDateInputsToMonth();
   document.getElementById('monthYearSelect').value = `${appState.view.year}-${String(appState.view.month).padStart(2, '0')}`;
   document.getElementById('islamicToggle').checked = appState.doc.settings.showIslamicDates;
@@ -476,14 +679,57 @@ function isOutsideVisibleMonth(iso) {
 function moveEvent(eventId, targetDate, anchorDate) {
   const existing = appState.doc.events.find((item) => item.id === eventId);
   if (!existing || !targetDate || !anchorDate) return;
+  const { start: monthStart, end: monthEnd } = monthBoundsIso();
+  if (targetDate < monthStart || targetDate > monthEnd) {
+    flash('Moved event must stay within the current month.', 'danger');
+    return;
+  }
+
+  if (supportsScopedAction(existing, anchorDate)) {
+    const moveMode = askSeriesActionMode(existing, 'move');
+    if (!moveMode) return;
+    if (moveMode === 'single') {
+      if (!eventOccursOnDate(existing, anchorDate)) {
+        flash('Could not move the selected event date.', 'danger');
+        return;
+      }
+      const standalone = normalizeEvent({
+        ...existing,
+        id: uuid(),
+        startDate: targetDate,
+        endDate: targetDate,
+        recurrenceType: 'none',
+        recurrenceWeekdays: [],
+        labels: {},
+        updatedAt: new Date().toISOString(),
+      });
+      pushUndo(appState.doc);
+      if (!deleteSingleEventOccurrence(existing, anchorDate)) {
+        flash('Could not move the selected event date.', 'danger');
+        return;
+      }
+      appState.doc.events.push(standalone);
+      schedulePersist(appState.doc, 'event-move-occurrence', setLastSaved);
+      rerender();
+      flash('Selected event date moved as a standalone event.');
+      return;
+    }
+  }
+
   const source = new Date(`${anchorDate}T00:00:00Z`);
   const target = new Date(`${targetDate}T00:00:00Z`);
   const delta = Math.round((target - source) / 86400000);
   if (!Number.isFinite(delta) || delta === 0) return;
+  const nextStart = shiftIsoDate(existing.startDate, delta);
+  const nextEnd = shiftIsoDate(existing.endDate, delta);
+  if (nextStart < monthStart || nextEnd > monthEnd) {
+    flash('Moved event must stay within the current month.', 'danger');
+    return;
+  }
   const updated = {
     ...existing,
-    startDate: shiftIsoDate(existing.startDate, delta),
-    endDate: shiftIsoDate(existing.endDate, delta),
+    startDate: nextStart,
+    endDate: nextEnd,
   };
   const index = appState.doc.events.findIndex((item) => item.id === eventId);
   if (index < 0) return;
@@ -617,26 +863,43 @@ function setLastSaved(ts) {
 }
 
 function openEventModal(payload) {
-  const occurrenceDate = typeof payload === 'object'
+  const requestedOccurrenceDate = typeof payload === 'object'
     ? (payload.occurrenceDate || payload.occurrence_date || '')
     : '';
-  const p = typeof payload === 'string'
+  const sourceEvent = typeof payload === 'string'
     ? appState.doc.events.find((e) => e.id === payload)
     : (payload?.eventId ? appState.doc.events.find((e) => e.id === payload.eventId) : payload);
-  if (!p) return;
+  if (!sourceEvent) return;
+
+  resetEventScopeState();
+  let occurrenceDate = requestedOccurrenceDate || sourceEvent.startDate || sourceEvent.start_date || '';
+  let modalEvent = sourceEvent;
+
+  if (sourceEvent.id && supportsScopedAction(sourceEvent, occurrenceDate)) {
+    const editMode = askSeriesActionMode(sourceEvent, 'edit');
+    if (!editMode) return;
+    if (editMode === 'single') {
+      modalEvent = buildSingleOccurrenceDraft(sourceEvent, occurrenceDate);
+      document.getElementById('editScopeMode').value = 'single';
+      document.getElementById('editSourceEventId').value = sourceEvent.id;
+      document.getElementById('editOccurrenceDate').value = occurrenceDate;
+      setEventScopeBanner(`Editing only ${formatMonthDate(occurrenceDate)}. Saving will create a standalone event and remove that date from the original series.`);
+    }
+  }
+
   syncDateInputsToMonth();
-  document.getElementById('eventId').value = p.id || '';
-  document.getElementById('title').value = p.title || '';
-  document.getElementById('startDate').value = p.startDate || p.start_date || '';
-  document.getElementById('endDate').value = p.endDate || p.end_date || p.startDate || p.start_date || '';
-  document.getElementById('startTime').value = p.startTime || p.start_time || '';
-  document.getElementById('location').value = p.location || '';
-  document.getElementById('audience').value = p.audience || 'Unspecified';
-  document.getElementById('notes').value = p.notes || '';
-  document.querySelectorAll('#weekdayCheckboxes input').forEach((cb) => { cb.checked = (p.recurrenceWeekdays || []).includes(cb.value); });
+  document.getElementById('eventId').value = modalEvent.id || '';
+  document.getElementById('title').value = modalEvent.title || '';
+  document.getElementById('startDate').value = modalEvent.startDate || modalEvent.start_date || '';
+  document.getElementById('endDate').value = modalEvent.endDate || modalEvent.end_date || modalEvent.startDate || modalEvent.start_date || '';
+  document.getElementById('startTime').value = modalEvent.startTime || modalEvent.start_time || '';
+  document.getElementById('location').value = modalEvent.location || '';
+  document.getElementById('audience').value = modalEvent.audience || 'Unspecified';
+  document.getElementById('notes').value = modalEvent.notes || '';
+  document.querySelectorAll('#weekdayCheckboxes input').forEach((cb) => { cb.checked = (modalEvent.recurrenceWeekdays || []).includes(cb.value); });
   syncRecurrenceTypeFromWeekdays();
-  document.getElementById('deleteEventBtn').classList.toggle('d-none', !p.id);
-  document.getElementById('deleteEventBtn').dataset.occurrenceDate = occurrenceDate || p.startDate || '';
+  document.getElementById('deleteEventBtn').classList.toggle('d-none', !modalEvent.id);
+  document.getElementById('deleteEventBtn').dataset.occurrenceDate = occurrenceDate || modalEvent.startDate || '';
   eventModal.show();
 }
 
@@ -722,6 +985,9 @@ function bindMainUI() {
       flash('Event start/end dates must stay within the selected month.', 'danger');
       return;
     }
+    const editScopeMode = document.getElementById('editScopeMode').value;
+    const sourceEventId = document.getElementById('editSourceEventId').value;
+    const occurrenceDate = document.getElementById('editOccurrenceDate').value;
     const payload = normalizeEvent({
       id: document.getElementById('eventId').value || uuid(),
       title: document.getElementById('title').value.trim(),
@@ -735,11 +1001,26 @@ function bindMainUI() {
       recurrenceType: document.getElementById('recurrenceType').value,
       recurrenceWeekdays: Array.from(document.querySelectorAll('#weekdayCheckboxes input:checked')).map((cb) => cb.value),
     });
-    pushUndo(appState.doc);
-    const idx = appState.doc.events.findIndex((e) => e.id === payload.id);
-    if (idx >= 0) appState.doc.events[idx] = payload;
-    else appState.doc.events.push(payload);
+    if (editScopeMode === 'single' && sourceEventId && occurrenceDate) {
+      const sourceEvent = appState.doc.events.find((item) => item.id === sourceEventId);
+      if (!sourceEvent || !eventOccursOnDate(sourceEvent, occurrenceDate)) {
+        flash('The selected event date could not be edited.', 'danger');
+        return;
+      }
+      pushUndo(appState.doc);
+      if (!deleteSingleEventOccurrence(sourceEvent, occurrenceDate)) {
+        flash('The selected event date could not be edited.', 'danger');
+        return;
+      }
+      appState.doc.events.push({ ...payload, id: uuid() });
+    } else {
+      pushUndo(appState.doc);
+      const idx = appState.doc.events.findIndex((e) => e.id === payload.id);
+      if (idx >= 0) appState.doc.events[idx] = payload;
+      else appState.doc.events.push(payload);
+    }
     schedulePersist(appState.doc, 'event', setLastSaved);
+    resetEventScopeState();
     eventModal.hide();
     rerender();
   });
@@ -748,6 +1029,9 @@ function bindMainUI() {
     const id = document.getElementById('eventId').value;
     const occurrenceDate = document.getElementById('deleteEventBtn').dataset.occurrenceDate || document.getElementById('startDate').value;
     if (deleteUserEvent(id, occurrenceDate)) eventModal.hide();
+  });
+  document.getElementById('eventModal').addEventListener('hidden.bs.modal', () => {
+    resetEventScopeState();
   });
 
   document.getElementById('holidaysToggle').addEventListener('change', (e) => {
@@ -873,6 +1157,30 @@ function bindMainUI() {
   document.getElementById('printBtn').addEventListener('click', printCalendar);
   document.getElementById('exportImageBtn').addEventListener('click', async () => {
     try { await exportCalendarImage(); } catch { flash('Image export failed.', 'danger'); }
+  });
+  document.getElementById('restoreHiddenItemsBtn').addEventListener('click', restoreAllHiddenItems);
+  document.getElementById('restoreAllHiddenItemsBtn').addEventListener('click', restoreAllHiddenItems);
+  document.getElementById('hiddenItemsModal').addEventListener('show.bs.modal', () => {
+    renderHiddenItemsUI();
+  });
+  document.getElementById('shareModal').addEventListener('show.bs.modal', () => {
+    updateShareUI();
+  });
+  document.getElementById('copyShareMessageBtn').addEventListener('click', async () => {
+    const copied = await copyText(currentShareMessage());
+    flash(copied ? 'Share message copied.' : 'Could not copy the share message.', copied ? 'success' : 'danger');
+  });
+  document.getElementById('copyWhatsappMessageBtn').addEventListener('click', async () => {
+    const copied = await copyText(currentShareMessage());
+    flash(copied ? 'WhatsApp text copied.' : 'Could not copy the WhatsApp text.', copied ? 'success' : 'danger');
+  });
+  document.getElementById('nativeShareBtn').addEventListener('click', async () => {
+    if (typeof navigator.share !== 'function') return;
+    try {
+      await navigator.share({ title: browserTabTitle(appState.view.year, appState.view.month), text: currentShareMessage() });
+    } catch (error) {
+      if (error?.name !== 'AbortError') flash('Could not open the device share sheet.', 'danger');
+    }
   });
   document.getElementById('clearStorageBtn').addEventListener('click', async () => {
     localStorage.removeItem(LEGACY_STORAGE_KEY);

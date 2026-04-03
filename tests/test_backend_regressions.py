@@ -265,6 +265,79 @@ class BackendRegressionTests(unittest.TestCase):
             self.assertEqual({label.day_offset: label.label for label in events[0].day_labels}, {0: 'Arrival'})
             self.assertEqual({label.day_offset: label.label for label in events[1].day_labels}, {0: 'Closing'})
 
+    def test_move_single_day_from_multi_day_event_creates_standalone_event(self) -> None:
+        with self.app.app_context():
+            event = Event(
+                title='Retreat',
+                start_date=date(2026, 4, 10),
+                end_date=date(2026, 4, 12),
+                audience='All',
+                recurrence_type='none',
+                all_day=True,
+            )
+            db.session.add(event)
+            db.session.commit()
+            event_id = event.id
+
+        response = self.client.post(
+            f'/events/move/{event_id}',
+            data={
+                'target_date': '2026-04-20',
+                'anchor_date': '2026-04-11',
+                'move_mode': 'single',
+                'return_year': '2026',
+                'return_month': '04',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            events = Event.query.order_by(Event.start_date.asc(), Event.id.asc()).all()
+            self.assertEqual(len(events), 3)
+            self.assertEqual((events[0].start_date, events[0].end_date), (date(2026, 4, 10), date(2026, 4, 10)))
+            self.assertEqual((events[1].start_date, events[1].end_date), (date(2026, 4, 12), date(2026, 4, 12)))
+            self.assertEqual((events[2].start_date, events[2].end_date), (date(2026, 4, 20), date(2026, 4, 20)))
+
+    def test_save_single_occurrence_edit_creates_standalone_event(self) -> None:
+        with self.app.app_context():
+            event = Event(
+                title='Daily prayers',
+                start_date=date(2026, 4, 10),
+                end_date=date(2026, 4, 12),
+                audience='All',
+                recurrence_type='daily',
+                all_day=True,
+            )
+            db.session.add(event)
+            db.session.commit()
+            source_event_id = event.id
+
+        response = self.client.post(
+            '/events/save',
+            data={
+                'source_event_id': str(source_event_id),
+                'edit_mode': 'single',
+                'occurrence_date': '2026-04-11',
+                'title': 'Special prayers',
+                'start_date': '2026-04-11',
+                'end_date': '2026-04-11',
+                'start_time': '',
+                'audience': 'All',
+                'location': 'Main hall',
+                'notes': 'Updated details',
+                'return_year': '2026',
+                'return_month': '04',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            events = Event.query.order_by(Event.start_date.asc(), Event.id.asc()).all()
+            self.assertEqual(len(events), 3)
+            self.assertEqual((events[0].title, events[0].start_date, events[0].end_date), ('Daily prayers', date(2026, 4, 10), date(2026, 4, 10)))
+            self.assertEqual((events[1].title, events[1].start_date, events[1].end_date), ('Special prayers', date(2026, 4, 11), date(2026, 4, 11)))
+            self.assertEqual((events[2].title, events[2].start_date, events[2].end_date), ('Daily prayers', date(2026, 4, 12), date(2026, 4, 12)))
+
 
 if __name__ == '__main__':
     unittest.main()
