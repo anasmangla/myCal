@@ -473,6 +473,91 @@ function moveEvent(eventId, targetDate, anchorDate) {
   rerender();
 }
 
+function askRecurringDeleteMode() {
+  const deleteSelectedDate = window.confirm(
+    'This is a recurring event.\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.'
+  );
+  if (deleteSelectedDate) return 'single';
+  const deleteSeries = window.confirm('Delete the entire recurring event series?');
+  return deleteSeries ? 'all' : '';
+}
+
+function eventOccursOnDate(event, occurrenceDate) {
+  if (!event || !occurrenceDate || occurrenceDate < event.startDate || occurrenceDate > event.endDate) return false;
+  if (event.recurrenceType === 'daily') return true;
+  if (event.recurrenceType === 'weekly') {
+    const weekday = String(new Date(`${occurrenceDate}T00:00:00Z`).getUTCDay());
+    const weekdays = new Set((event.recurrenceWeekdays || []).map(String));
+    return weekdays.has(weekday);
+  }
+  return event.startDate === occurrenceDate;
+}
+
+function deleteSingleRecurringOccurrence(event, occurrenceDate) {
+  const index = appState.doc.events.findIndex((item) => item.id === event.id);
+  if (index < 0) return false;
+
+  const beforeEnd = shiftIsoDate(occurrenceDate, -1);
+  const afterStart = shiftIsoDate(occurrenceDate, 1);
+  const keepBefore = beforeEnd >= event.startDate;
+  const keepAfter = afterStart <= event.endDate;
+  const updatedAt = new Date().toISOString();
+
+  if (keepBefore && keepAfter) {
+    appState.doc.events[index] = { ...event, endDate: beforeEnd, updatedAt };
+    appState.doc.events.splice(index + 1, 0, { ...event, id: uuid(), startDate: afterStart, updatedAt });
+    return true;
+  }
+  if (keepBefore) {
+    appState.doc.events[index] = { ...event, endDate: beforeEnd, updatedAt };
+    return true;
+  }
+  if (keepAfter) {
+    appState.doc.events[index] = { ...event, startDate: afterStart, updatedAt };
+    return true;
+  }
+
+  appState.doc.events.splice(index, 1);
+  return true;
+}
+
+function deleteUserEvent(eventId, occurrenceDate = '') {
+  const index = appState.doc.events.findIndex((item) => item.id === eventId);
+  if (index < 0) return false;
+
+  const event = appState.doc.events[index];
+  const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
+  const targetOccurrenceDate = occurrenceDate || event.startDate;
+
+  if (!isRecurring) {
+    pushUndo(appState.doc);
+    appState.doc.events.splice(index, 1);
+    schedulePersist(appState.doc, 'event-delete', setLastSaved);
+    rerender();
+    return true;
+  }
+
+  const deleteMode = askRecurringDeleteMode();
+  if (!deleteMode) return false;
+
+  pushUndo(appState.doc);
+  if (deleteMode === 'all') {
+    appState.doc.events.splice(index, 1);
+    schedulePersist(appState.doc, 'event-delete-series', setLastSaved);
+    rerender();
+    return true;
+  }
+
+  if (!eventOccursOnDate(event, targetOccurrenceDate) || !deleteSingleRecurringOccurrence(event, targetOccurrenceDate)) {
+    flash('Could not delete the selected recurring occurrence.', 'danger');
+    return false;
+  }
+
+  schedulePersist(appState.doc, 'event-delete-occurrence', setLastSaved);
+  rerender();
+  return true;
+}
+
 function setLastSaved(ts) {
   appState.lastSavedAt = ts;
   const lastSavedText = document.getElementById('lastSavedText');
@@ -482,7 +567,12 @@ function setLastSaved(ts) {
 }
 
 function openEventModal(payload) {
-  const p = typeof payload === 'string' ? appState.doc.events.find((e) => e.id === payload) : payload;
+  const occurrenceDate = typeof payload === 'object'
+    ? (payload.occurrenceDate || payload.occurrence_date || '')
+    : '';
+  const p = typeof payload === 'string'
+    ? appState.doc.events.find((e) => e.id === payload)
+    : (payload?.eventId ? appState.doc.events.find((e) => e.id === payload.eventId) : payload);
   if (!p) return;
   syncDateInputsToMonth();
   document.getElementById('eventId').value = p.id || '';
@@ -496,6 +586,7 @@ function openEventModal(payload) {
   document.querySelectorAll('#weekdayCheckboxes input').forEach((cb) => { cb.checked = (p.recurrenceWeekdays || []).includes(cb.value); });
   syncRecurrenceTypeFromWeekdays();
   document.getElementById('deleteEventBtn').classList.toggle('d-none', !p.id);
+  document.getElementById('deleteEventBtn').dataset.occurrenceDate = occurrenceDate || p.startDate || '';
   eventModal.show();
 }
 
@@ -605,10 +696,8 @@ function bindMainUI() {
 
   document.getElementById('deleteEventBtn').addEventListener('click', () => {
     const id = document.getElementById('eventId').value;
-    appState.doc.events = appState.doc.events.filter((e) => e.id !== id);
-    schedulePersist(appState.doc, 'event-delete', setLastSaved);
-    eventModal.hide();
-    rerender();
+    const occurrenceDate = document.getElementById('deleteEventBtn').dataset.occurrenceDate || document.getElementById('startDate').value;
+    if (deleteUserEvent(id, occurrenceDate)) eventModal.hide();
   });
 
   document.getElementById('holidaysToggle').addEventListener('change', (e) => {
@@ -819,7 +908,7 @@ function bindMainUI() {
   document.getElementById('contextModifyEvent').addEventListener('click', () => {
     hideMenus();
     if (!activeEventContext.eventId) return;
-    openEventModal(activeEventContext.eventId);
+    openEventModal({ eventId: activeEventContext.eventId, occurrenceDate: activeEventContext.occurrenceDate });
   });
   document.getElementById('contextMoveEvent').addEventListener('click', () => {
     hideMenus();
@@ -831,7 +920,7 @@ function bindMainUI() {
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();
-    const { eventId, sourceType, occurrenceKey } = activeEventContext;
+    const { eventId, sourceType, occurrenceKey, occurrenceDate } = activeEventContext;
     if (sourceType === 'usa-jamaat') {
       if (!occurrenceKey) return;
       toggleHiddenDate('usaJamaatOccurrences', occurrenceKey);
@@ -840,9 +929,7 @@ function bindMainUI() {
       return;
     }
     if (!eventId) return;
-    appState.doc.events = appState.doc.events.filter((item) => item.id !== eventId);
-    schedulePersist(appState.doc, 'event-delete', setLastSaved);
-    rerender();
+    deleteUserEvent(eventId, occurrenceDate);
   });
   document.addEventListener('click', (event) => {
     if (!event.target.closest('.context-menu')) hideMenus();

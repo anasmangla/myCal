@@ -211,7 +211,7 @@ export function renderCalendar({
           if (eventChip) return;
           const firstEvent = (events[key] || []).find((item) => item.sourceEventId && !item.isHoliday);
           if (firstEvent) {
-            onOpenEvent(firstEvent.sourceEventId);
+            onOpenEvent({ eventId: firstEvent.sourceEventId, occurrenceDate: firstEvent.occurrenceDate || key });
             return;
           }
           onOpenActions(key);
@@ -373,12 +373,16 @@ export function renderCalendar({
         chip.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.sourceType === 'user' && item.sourceEventId) onOpenEvent(item.sourceEventId);
+          if (item.sourceType === 'user' && item.sourceEventId) {
+            onOpenEvent({ eventId: item.sourceEventId, occurrenceDate: item.occurrenceDate || key });
+          }
         });
         chip.addEventListener('dblclick', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.sourceType === 'user' && item.sourceEventId) onOpenEvent(item.sourceEventId);
+          if (item.sourceType === 'user' && item.sourceEventId) {
+            onOpenEvent({ eventId: item.sourceEventId, occurrenceDate: item.occurrenceDate || key });
+          }
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();

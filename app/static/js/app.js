@@ -144,12 +144,12 @@ document.addEventListener('DOMContentLoaded', () => {
         event.stopPropagation();
         const sourceEventId = Number(eventChip.dataset.sourceEventId);
         selectEvent({ eventId: sourceEventId, occurrenceDate: activeDate, sourceType: 'user', occurrenceKey: `event-${sourceEventId}@${activeDate}` });
-        await openEventById(sourceEventId);
+        await openEventById(sourceEventId, activeDate);
         return;
       }
       if (activeEventId && activeEventOccurrenceDate === activeDate) {
         event.preventDefault();
-        await openEventById(activeEventId);
+        await openEventById(activeEventId, activeDate);
         return;
       }
       const dateItems = data.events[activeDate] || [];
@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
           occurrenceKey: firstEvent.occurrence_key || `event-${firstEvent.source_event_id}@${activeDate}`,
           title: firstEvent.title || '',
         });
-        await openEventById(firstEvent.source_event_id);
+        await openEventById(firstEvent.source_event_id, activeDate);
         return;
       }
       openEventModal({ start_date: activeDate, end_date: activeDate });
@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
             title: item.title || '',
           });
-          await openEventById(item.source_event_id);
+          await openEventById(item.source_event_id, date);
         });
         chip.addEventListener('dblclick', async (event) => {
           event.preventDefault();
@@ -342,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
             title: item.title || '',
           });
-          await openEventById(item.source_event_id);
+          await openEventById(item.source_event_id, date);
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('contextModifyEvent').addEventListener('click', async () => {
     hideMenus();
     if (activeEventSourceType !== 'user' || !activeEventId) return;
-    await openEventById(activeEventId);
+    await openEventById(activeEventId, activeEventOccurrenceDate || '');
   });
 
   document.getElementById('contextMoveEvent').addEventListener('click', () => {
@@ -843,7 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function openEventModal(payload) {
+  function openEventModal(payload, occurrenceDate = '') {
     const candidateStartDate = payload.start_date || payload.startDate || '';
     const candidateEndDate = payload.end_date || payload.endDate || candidateStartDate;
     if (
@@ -873,6 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
     syncRecurrenceType();
     syncRecurringEndDate(Boolean(payload.id));
     buildDayLabels(payload.labels || {});
+    document.getElementById('deleteEventBtn').dataset.occurrenceDate = occurrenceDate || candidateStartDate || '';
     eventModal.show();
   }
 
@@ -1088,21 +1089,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function openEventById(eventId) {
+  async function openEventById(eventId, occurrenceDate = '') {
     const payload = await fetchEventDetails(eventId);
     if (!payload) {
       showValidation('Unable to load this event right now. Please try again.');
       return;
     }
-    openEventModal(payload);
+    openEventModal(payload, occurrenceDate || activeEventOccurrenceDate || payload.start_date || '');
   }
 
   function askDeleteMode() {
     const deleteOne = window.confirm(
-      'This is a recurring event.\n\nPress OK to delete only this occurrence.\nPress Cancel to choose another option.'
+      'This is a recurring event.\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.'
     );
     if (deleteOne) return 'single';
-    const deleteAll = window.confirm('Delete all occurrences in this recurring event series?');
+    const deleteAll = window.confirm('Delete the entire recurring event series?');
     return deleteAll ? 'all' : '';
   }
 
@@ -1184,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (deleteEventBtn) {
     deleteEventBtn.addEventListener('click', async () => {
       const eventId = Number(document.getElementById('eventId').value);
-      const occurrenceDate = document.getElementById('startDate').value;
+      const occurrenceDate = deleteEventBtn.dataset.occurrenceDate || document.getElementById('startDate').value;
       await submitDeleteEvent(eventId, occurrenceDate);
       eventModal.hide();
     });
