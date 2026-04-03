@@ -156,10 +156,11 @@ export function renderCalendar({
   const visibleEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const hiddenUsaJamaatOccurrences = new Set(state.doc.settings?.hiddenMeta?.usaJamaatOccurrences || []);
+  const hiddenUsaJamaatSeries = new Set(state.doc.settings?.hiddenMeta?.usaJamaatSeries || []);
   const userEvents = visibleEventMap(state.doc.events, visibleStart, visibleEnd, audienceColors);
   const usaJamaatEvents = state.doc.settings?.showUsaJamaat === false
     ? {}
-    : visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenUsaJamaatOccurrences);
+    : visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenUsaJamaatOccurrences, hiddenUsaJamaatSeries);
   const events = mergeOccurrenceMaps(userEvents, usaJamaatEvents);
   const hiddenHolidayDates = new Set(state.doc.settings?.hiddenMeta?.holidays || []);
   const hiddenIslamicDates = new Set(state.doc.settings?.hiddenMeta?.islamic || []);
@@ -394,6 +395,8 @@ export function renderCalendar({
             sourceType: item.sourceType || 'user',
             occurrenceDate: item.occurrenceDate || key,
             occurrenceKey: item.occurrenceKey || '',
+            seriesKey: item.seriesKey || '',
+            seriesSpanDays: item.seriesSpanDays || 1,
             title: item.title || item.displayText,
             x: event.pageX,
             y: event.pageY,

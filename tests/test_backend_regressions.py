@@ -8,7 +8,7 @@ from io import BytesIO
 from app import create_app, db
 from app.calendar_utils import build_month_grid, build_week_metadata, month_context
 from app.event_utils import ValidationError, parse_event_form
-from app.models import Event
+from app.models import Event, EventDayLabel
 from app.routes import _build_event_from_import
 from werkzeug.datastructures import ImmutableMultiDict
 
@@ -198,6 +198,27 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertTrue(any('Quran Talks' in item.get('title', '') for item in january_occurrences))
         self.assertEqual(disabled['occurrences'].get('2026-01-03', []), [])
 
+    def test_month_context_formats_multi_day_usa_jamaat_labels(self) -> None:
+        with self.app.app_context():
+            context = month_context(2026, 1, include_holidays=False, include_usa_jamaat=True)
+
+        first_day = context['occurrences'].get('2026-01-03', [])
+        second_day = context['occurrences'].get('2026-01-04', [])
+        self.assertTrue(
+            any(
+                item.get('is_usa_jamaat')
+                and item.get('label') == "Day 1: Local Jama'at/Auxiliary Activities Review of 2025 and Plan 2026 activities"
+                for item in first_day
+            )
+        )
+        self.assertTrue(
+            any(
+                item.get('is_usa_jamaat')
+                and item.get('label') == "Day 2: Local Jama'at/Auxiliary Activities Review of 2025 and Plan 2026 activities"
+                for item in second_day
+            )
+        )
+
     def test_export_ics_can_include_usa_jamaat_feed(self) -> None:
         response = self.client.get('/data/export.ics?month_year=2026-01&holidays=0&usa_jamaat=1')
         self.assertEqual(response.status_code, 200)
@@ -205,6 +226,44 @@ class BackendRegressionTests(unittest.TestCase):
         content = response.data.decode('utf-8')
         self.assertIn("SUMMARY:New Year's Day", content)
         self.assertIn('SUMMARY:Quran Talks - 7:00 PM', content)
+
+    def test_delete_single_day_from_multi_day_event_preserves_segments_and_labels(self) -> None:
+        with self.app.app_context():
+            event = Event(
+                title='Retreat',
+                start_date=date(2026, 4, 10),
+                end_date=date(2026, 4, 12),
+                audience='All',
+                recurrence_type='none',
+                all_day=True,
+            )
+            event.day_labels = [
+                EventDayLabel(day_offset=0, label='Arrival'),
+                EventDayLabel(day_offset=1, label='Workshop'),
+                EventDayLabel(day_offset=2, label='Closing'),
+            ]
+            db.session.add(event)
+            db.session.commit()
+            event_id = event.id
+
+        response = self.client.post(
+            f'/events/delete/{event_id}',
+            data={
+                'delete_mode': 'single',
+                'occurrence_date': '2026-04-11',
+                'return_year': '2026',
+                'return_month': '04',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            events = Event.query.order_by(Event.start_date.asc(), Event.id.asc()).all()
+            self.assertEqual(len(events), 2)
+            self.assertEqual((events[0].start_date, events[0].end_date), (date(2026, 4, 10), date(2026, 4, 10)))
+            self.assertEqual((events[1].start_date, events[1].end_date), (date(2026, 4, 12), date(2026, 4, 12)))
+            self.assertEqual({label.day_offset: label.label for label in events[0].day_labels}, {0: 'Arrival'})
+            self.assertEqual({label.day_offset: label.label for label in events[1].day_labels}, {0: 'Closing'})
 
 
 if __name__ == '__main__':

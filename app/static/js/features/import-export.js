@@ -114,7 +114,8 @@ function buildVisibleOccurrenceRows(doc) {
 
   if (doc.settings?.showUsaJamaat !== false) {
     const hiddenKeys = new Set(doc.settings?.hiddenMeta?.usaJamaatOccurrences || []);
-    const usaJamaatMap = visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenKeys);
+    const hiddenSeries = new Set(doc.settings?.hiddenMeta?.usaJamaatSeries || []);
+    const usaJamaatMap = visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenKeys, hiddenSeries);
     Object.entries(usaJamaatMap).forEach(([date, items]) => {
       items.forEach((item) => {
         rows.push({

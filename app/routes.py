@@ -193,7 +193,7 @@ def delete_event(event_id: int):
     delete_mode = (request.form.get('delete_mode') or 'all').strip().lower()
     occurrence_raw = request.form.get('occurrence_date')
 
-    if event.recurrence_type == 'none' or delete_mode != 'single':
+    if not _supports_single_occurrence_delete(event) or delete_mode != 'single':
         db.session.delete(event)
         db.session.commit()
         flash('Event deleted.', 'success')
@@ -208,12 +208,12 @@ def delete_event(event_id: int):
         return redirect(_return_url())
 
     if not _is_valid_occurrence_date(event, occurrence_day):
-        flash('The selected recurring occurrence could not be deleted.', 'danger')
+        flash('The selected event date could not be deleted.', 'danger')
         return redirect(_return_url())
 
     _delete_single_occurrence(event, occurrence_day)
     db.session.commit()
-    flash('Recurring event occurrence deleted.', 'success')
+    flash('Selected event date deleted.', 'success')
     return redirect(_return_url())
 
 
@@ -489,6 +489,10 @@ def _clone_event(source: Event) -> Event:
     return duplicate
 
 
+def _supports_single_occurrence_delete(event: Event) -> bool:
+    return event.recurrence_type != 'none' or event.end_date > event.start_date
+
+
 def _is_valid_occurrence_date(event: Event, occurrence_day):
     if occurrence_day < event.start_date or occurrence_day > event.end_date:
         return False
@@ -496,11 +500,29 @@ def _is_valid_occurrence_date(event: Event, occurrence_day):
         return True
     if event.recurrence_type == 'weekly':
         return day_in_weekly_pattern(occurrence_day, event.recurrence_weekdays)
-    return False
+    return True
+
+
+def _segment_day_labels(source_labels: list[EventDayLabel], original_start: date, segment_start: date, segment_end: date) -> list[EventDayLabel]:
+    start_offset = (segment_start - original_start).days
+    end_offset = (segment_end - original_start).days
+    return [
+        EventDayLabel(day_offset=item.day_offset - start_offset, label=item.label)
+        for item in source_labels
+        if start_offset <= item.day_offset <= end_offset
+    ]
+
+
+def _apply_segment_to_event(event: Event, source_labels: list[EventDayLabel], original_start: date, segment_start: date, segment_end: date) -> None:
+    event.start_date = segment_start
+    event.end_date = segment_end
+    event.day_labels = _segment_day_labels(source_labels, original_start, segment_start, segment_end)
 
 
 def _delete_single_occurrence(event: Event, occurrence_day):
+    original_start = event.start_date
     original_end = event.end_date
+    source_labels = list(event.day_labels)
     before_end = occurrence_day - timedelta(days=1)
     after_start = occurrence_day + timedelta(days=1)
 
@@ -509,18 +531,17 @@ def _delete_single_occurrence(event: Event, occurrence_day):
 
     if keep_before and keep_after:
         follow_up = _clone_event(event)
-        follow_up.start_date = after_start
-        follow_up.end_date = original_end
-        event.end_date = before_end
+        _apply_segment_to_event(event, source_labels, original_start, original_start, before_end)
+        _apply_segment_to_event(follow_up, source_labels, original_start, after_start, original_end)
         db.session.add(follow_up)
         return
 
     if keep_before:
-        event.end_date = before_end
+        _apply_segment_to_event(event, source_labels, original_start, original_start, before_end)
         return
 
     if keep_after:
-        event.start_date = after_start
+        _apply_segment_to_event(event, source_labels, original_start, after_start, original_end)
         return
 
     db.session.delete(event)

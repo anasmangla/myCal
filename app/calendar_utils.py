@@ -69,6 +69,8 @@ class Occurrence:
     source_type: str = 'user'
     occurrence_key: str | None = None
     is_usa_jamaat: bool = False
+    series_key: str | None = None
+    series_span_days: int = 1
 
 
 @dataclass
@@ -148,6 +150,7 @@ def occurrence_color(audience: str, custom_color: str | None = None) -> str:
 
 
 def build_occurrence(event: Event, current_day: date, label: str) -> Occurrence:
+    span_days = (event.end_date - event.start_date).days + 1
     return Occurrence(
         event_id=f'event-{event.id}-{current_day.isoformat()}',
         source_event_id=event.id,
@@ -165,6 +168,8 @@ def build_occurrence(event: Event, current_day: date, label: str) -> Occurrence:
         uses_custom_color=bool(event.color),
         source_type='user',
         occurrence_key=f'event-{event.id}@{current_day.isoformat()}',
+        series_key=f'event-{event.id}',
+        series_span_days=span_days,
     )
 
 
@@ -238,18 +243,22 @@ def holiday_occurrence(holiday_day: date, name: str) -> Occurrence:
         is_holiday=True,
         source_type='holiday',
         occurrence_key=f'holiday@{holiday_day.isoformat()}',
+        series_key=f'holiday@{holiday_day.isoformat()}',
     )
 
 
 def usa_jamaat_occurrence(event: dict, current_day: date) -> Occurrence:
+    span_days = (event['end_date'] - event['start_date']).days + 1
+    day_offset = (current_day - event['start_date']).days
+    label = f"Day {day_offset + 1}: {event['title']}" if span_days > 1 else event['title']
     occurrence_key = f"{event['id']}@{current_day.isoformat()}"
     return Occurrence(
         event_id=occurrence_key,
         source_event_id=None,
         date=current_day,
         title=event['title'],
-        label=event['title'],
-        display_text=event['title'],
+        label=label,
+        display_text=label,
         start_time=None,
         end_time=None,
         all_day=True,
@@ -260,6 +269,8 @@ def usa_jamaat_occurrence(event: dict, current_day: date) -> Occurrence:
         source_type='usa-jamaat',
         occurrence_key=occurrence_key,
         is_usa_jamaat=True,
+        series_key=event['id'],
+        series_span_days=span_days,
     )
 
 
@@ -297,6 +308,8 @@ def serialize_occurrence(item: Occurrence) -> dict:
         'is_holiday': item.is_holiday,
         'is_usa_jamaat': item.is_usa_jamaat,
         'uses_custom_color': item.uses_custom_color,
+        'series_key': item.series_key,
+        'series_span_days': item.series_span_days,
     }
 
 

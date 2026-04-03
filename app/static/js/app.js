@@ -72,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeEventOccurrenceDate = null;
   let activeEventSourceType = 'user';
   let activeEventOccurrenceKey = '';
+  let activeEventSeriesKey = '';
+  let activeEventSeriesSpanDays = 1;
   let activeEventTitle = '';
   const hiddenMeta = loadHiddenMeta();
   const defaultThemeSettings = {
@@ -106,14 +108,18 @@ document.addEventListener('DOMContentLoaded', () => {
     activeEventOccurrenceDate = null;
     activeEventSourceType = 'user';
     activeEventOccurrenceKey = '';
+    activeEventSeriesKey = '';
+    activeEventSeriesSpanDays = 1;
     activeEventTitle = '';
   }
 
-  function selectEvent({ eventId = null, occurrenceDate = '', sourceType = 'user', occurrenceKey = '', title = '' } = {}) {
+  function selectEvent({ eventId = null, occurrenceDate = '', sourceType = 'user', occurrenceKey = '', seriesKey = '', seriesSpanDays = 1, title = '' } = {}) {
     activeEventId = eventId;
     activeEventOccurrenceDate = occurrenceDate;
     activeEventSourceType = sourceType;
     activeEventOccurrenceKey = occurrenceKey;
+    activeEventSeriesKey = seriesKey;
+    activeEventSeriesSpanDays = seriesSpanDays || 1;
     activeEventTitle = title;
   }
 
@@ -143,7 +149,14 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         event.stopPropagation();
         const sourceEventId = Number(eventChip.dataset.sourceEventId);
-        selectEvent({ eventId: sourceEventId, occurrenceDate: activeDate, sourceType: 'user', occurrenceKey: `event-${sourceEventId}@${activeDate}` });
+        selectEvent({
+          eventId: sourceEventId,
+          occurrenceDate: activeDate,
+          sourceType: 'user',
+          occurrenceKey: `event-${sourceEventId}@${activeDate}`,
+          seriesKey: `event-${sourceEventId}`,
+          seriesSpanDays: 1,
+        });
         await openEventById(sourceEventId, activeDate);
         return;
       }
@@ -161,6 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
           occurrenceDate: activeDate,
           sourceType: firstEvent.source_type || 'user',
           occurrenceKey: firstEvent.occurrence_key || `event-${firstEvent.source_event_id}@${activeDate}`,
+          seriesKey: firstEvent.series_key || '',
+          seriesSpanDays: firstEvent.series_span_days || 1,
           title: firstEvent.title || '',
         });
         await openEventById(firstEvent.source_event_id, activeDate);
@@ -215,7 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
     hideMenus();
     if (activeEventSourceType === 'usa-jamaat') {
       if (!activeEventOccurrenceKey) return;
-      toggleHiddenMeta('usaJamaatOccurrences', activeEventOccurrenceKey);
+      const deleteMode = activeEventSeriesSpanDays > 1 ? askDeleteMode(false) : 'single';
+      if (!deleteMode) return;
+      if (deleteMode === 'all' && activeEventSeriesKey) {
+        toggleHiddenMeta('usaJamaatSeries', activeEventSeriesKey);
+      } else {
+        toggleHiddenMeta('usaJamaatOccurrences', activeEventOccurrenceKey);
+      }
       renderCalendarDecorations();
       return;
     }
@@ -305,6 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
       container.innerHTML = '';
       items.forEach((item) => {
         if (item.is_holiday && isHiddenMeta('holidays', date)) return;
+        if (item.is_usa_jamaat && item.series_key && isHiddenMeta('usaJamaatSeries', item.series_key)) return;
         if (item.is_usa_jamaat && item.occurrence_key && isHiddenMeta('usaJamaatOccurrences', item.occurrence_key)) return;
         const chip = document.createElement('a');
         chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
@@ -327,6 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceDate: date,
             sourceType: item.source_type || 'user',
             occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            seriesKey: item.series_key || '',
+            seriesSpanDays: item.series_span_days || 1,
             title: item.title || '',
           });
           await openEventById(item.source_event_id, date);
@@ -340,6 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceDate: date,
             sourceType: item.source_type || 'user',
             occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            seriesKey: item.series_key || '',
+            seriesSpanDays: item.series_span_days || 1,
             title: item.title || '',
           });
           await openEventById(item.source_event_id, date);
@@ -354,6 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceDate: date,
             sourceType: item.source_type || 'user',
             occurrenceKey: item.occurrence_key || '',
+            seriesKey: item.series_key || '',
+            seriesSpanDays: item.series_span_days || 1,
             title: item.title || '',
           });
           syncEventMenuLabels();
@@ -366,6 +394,8 @@ document.addEventListener('DOMContentLoaded', () => {
             occurrenceDate: date,
             sourceType: item.source_type || 'user',
             occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            seriesKey: item.series_key || '',
+            seriesSpanDays: item.series_span_days || 1,
             title: item.title || '',
           });
           event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.source_event_id, anchorDate: date }));
@@ -1068,7 +1098,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
-    const deleteMode = isRecurring ? askDeleteMode() : 'all';
+    const isMultiDay = getSpanDays(details.start_date, details.end_date) > 1;
+    const deleteMode = (isRecurring || isMultiDay) ? askDeleteMode(isRecurring) : 'all';
     if (!deleteMode) return;
 
     deleteModeInput.value = deleteMode;
@@ -1098,12 +1129,13 @@ document.addEventListener('DOMContentLoaded', () => {
     openEventModal(payload, occurrenceDate || activeEventOccurrenceDate || payload.start_date || '');
   }
 
-  function askDeleteMode() {
+  function askDeleteMode(isRecurring = false) {
+    const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
     const deleteOne = window.confirm(
-      'This is a recurring event.\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.'
+      `${intro}\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.`
     );
     if (deleteOne) return 'single';
-    const deleteAll = window.confirm('Delete the entire recurring event series?');
+    const deleteAll = window.confirm('Delete the entire series?');
     return deleteAll ? 'all' : '';
   }
 
@@ -1120,9 +1152,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const usaJamaatOccurrences = Array.isArray(parsed.usaJamaatOccurrences)
         ? parsed.usaJamaatOccurrences.filter((value) => typeof value === 'string')
         : [];
-      return { holidays: new Set(holidays), islamic: new Set(islamic), usaJamaatOccurrences: new Set(usaJamaatOccurrences) };
+      const usaJamaatSeries = Array.isArray(parsed.usaJamaatSeries)
+        ? parsed.usaJamaatSeries.filter((value) => typeof value === 'string')
+        : [];
+      return {
+        holidays: new Set(holidays),
+        islamic: new Set(islamic),
+        usaJamaatOccurrences: new Set(usaJamaatOccurrences),
+        usaJamaatSeries: new Set(usaJamaatSeries),
+      };
     } catch (error) {
-      return { holidays: new Set(), islamic: new Set(), usaJamaatOccurrences: new Set() };
+      return { holidays: new Set(), islamic: new Set(), usaJamaatOccurrences: new Set(), usaJamaatSeries: new Set() };
     }
   }
 
@@ -1131,6 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
       holidays: Array.from(hiddenMeta.holidays),
       islamic: Array.from(hiddenMeta.islamic),
       usaJamaatOccurrences: Array.from(hiddenMeta.usaJamaatOccurrences),
+      usaJamaatSeries: Array.from(hiddenMeta.usaJamaatSeries),
     };
     window.localStorage.setItem(hiddenMetaStorageKey(), JSON.stringify(payload));
   }

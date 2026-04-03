@@ -12,13 +12,14 @@ import { applyCellTextStylePatch, openCellEditor, saveCellFromPanel, updateCellT
 import { setCellColor } from '../features/cell-colors.js';
 import { addImageToCell, clearImagesFromCell, moveImageBetweenCells, removeImageFromCell } from '../features/attachments.js';
 import { exportDocumentIcs, exportDocumentJson, parseImportJson } from '../features/import-export.js';
+import { getSpanDays } from '../features/events.js';
 import { bindSidePanel } from '../ui/sidepanel.js';
 import { printCalendar, exportCalendarImage } from '../features/print-export.js';
 import { searchDocument } from '../features/search.js';
 
 let eventModal;
 let activeDateContext = '';
-let activeEventContext = { eventId: '', occurrenceDate: '', sourceType: 'user', occurrenceKey: '', title: '' };
+let activeEventContext = { eventId: '', occurrenceDate: '', sourceType: 'user', occurrenceKey: '', seriesKey: '', seriesSpanDays: 1, title: '' };
 let pendingCellEditorFocus = false;
 let activeDraggedCellImage = null;
 const FONT_PRESETS = {
@@ -216,8 +217,16 @@ function rerender() {
       updateDateContextLabels(date);
       showMenu(document.getElementById('dateContextMenu'), x, y);
     },
-    onEventContext: ({ eventId, occurrenceDate, sourceType, occurrenceKey, title, x, y }) => {
-      activeEventContext = { eventId, occurrenceDate, sourceType: sourceType || 'user', occurrenceKey: occurrenceKey || '', title: title || '' };
+    onEventContext: ({ eventId, occurrenceDate, sourceType, occurrenceKey, seriesKey, seriesSpanDays, title, x, y }) => {
+      activeEventContext = {
+        eventId,
+        occurrenceDate,
+        sourceType: sourceType || 'user',
+        occurrenceKey: occurrenceKey || '',
+        seriesKey: seriesKey || '',
+        seriesSpanDays: seriesSpanDays || 1,
+        title: title || '',
+      };
       updateEventContextLabels();
       showMenu(document.getElementById('eventContextMenu'), x, y);
     },
@@ -388,13 +397,23 @@ function parseDragPayload(value) {
 }
 
 function hiddenDateSet(type) {
-  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = { holidays: [], islamic: [] });
+  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = {
+    holidays: [],
+    islamic: [],
+    usaJamaatOccurrences: [],
+    usaJamaatSeries: [],
+  });
   const values = Array.isArray(hiddenMeta[type]) ? hiddenMeta[type] : [];
   return new Set(values);
 }
 
 function setHiddenDateSet(type, values) {
-  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = { holidays: [], islamic: [] });
+  const hiddenMeta = appState.doc.settings.hiddenMeta || (appState.doc.settings.hiddenMeta = {
+    holidays: [],
+    islamic: [],
+    usaJamaatOccurrences: [],
+    usaJamaatSeries: [],
+  });
   hiddenMeta[type] = Array.from(values);
 }
 
@@ -473,13 +492,43 @@ function moveEvent(eventId, targetDate, anchorDate) {
   rerender();
 }
 
-function askRecurringDeleteMode() {
+function askSeriesDeleteMode(event) {
+  const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
+  const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
   const deleteSelectedDate = window.confirm(
-    'This is a recurring event.\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.'
+    `${intro}\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.`
   );
   if (deleteSelectedDate) return 'single';
-  const deleteSeries = window.confirm('Delete the entire recurring event series?');
+  const deleteSeries = window.confirm('Delete the entire series?');
   return deleteSeries ? 'all' : '';
+}
+
+function eventSpanDays(event) {
+  return getSpanDays(event.startDate, event.endDate);
+}
+
+function labelsForSegment(event, segmentStart, segmentEnd) {
+  const labels = event.labels || {};
+  const startOffset = getSpanDays(event.startDate, segmentStart) - 1;
+  const endOffset = getSpanDays(event.startDate, segmentEnd) - 1;
+  const nextLabels = {};
+  Object.entries(labels).forEach(([offsetKey, label]) => {
+    const offset = Number(offsetKey);
+    if (!Number.isFinite(offset) || offset < startOffset || offset > endOffset) return;
+    nextLabels[String(offset - startOffset)] = label;
+  });
+  return nextLabels;
+}
+
+function eventSegment(event, segmentStart, segmentEnd, id = event.id) {
+  return {
+    ...event,
+    id,
+    startDate: segmentStart,
+    endDate: segmentEnd,
+    labels: labelsForSegment(event, segmentStart, segmentEnd),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function eventOccursOnDate(event, occurrenceDate) {
@@ -490,30 +539,30 @@ function eventOccursOnDate(event, occurrenceDate) {
     const weekdays = new Set((event.recurrenceWeekdays || []).map(String));
     return weekdays.has(weekday);
   }
-  return event.startDate === occurrenceDate;
+  return true;
 }
 
-function deleteSingleRecurringOccurrence(event, occurrenceDate) {
+function deleteSingleEventOccurrence(event, occurrenceDate) {
   const index = appState.doc.events.findIndex((item) => item.id === event.id);
   if (index < 0) return false;
 
+  const originalEnd = event.endDate;
   const beforeEnd = shiftIsoDate(occurrenceDate, -1);
   const afterStart = shiftIsoDate(occurrenceDate, 1);
   const keepBefore = beforeEnd >= event.startDate;
-  const keepAfter = afterStart <= event.endDate;
-  const updatedAt = new Date().toISOString();
+  const keepAfter = afterStart <= originalEnd;
 
   if (keepBefore && keepAfter) {
-    appState.doc.events[index] = { ...event, endDate: beforeEnd, updatedAt };
-    appState.doc.events.splice(index + 1, 0, { ...event, id: uuid(), startDate: afterStart, updatedAt });
+    appState.doc.events[index] = eventSegment(event, event.startDate, beforeEnd, event.id);
+    appState.doc.events.splice(index + 1, 0, eventSegment(event, afterStart, originalEnd, uuid()));
     return true;
   }
   if (keepBefore) {
-    appState.doc.events[index] = { ...event, endDate: beforeEnd, updatedAt };
+    appState.doc.events[index] = eventSegment(event, event.startDate, beforeEnd, event.id);
     return true;
   }
   if (keepAfter) {
-    appState.doc.events[index] = { ...event, startDate: afterStart, updatedAt };
+    appState.doc.events[index] = eventSegment(event, afterStart, originalEnd, event.id);
     return true;
   }
 
@@ -527,9 +576,10 @@ function deleteUserEvent(eventId, occurrenceDate = '') {
 
   const event = appState.doc.events[index];
   const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
+  const isMultiDay = eventSpanDays(event) > 1;
   const targetOccurrenceDate = occurrenceDate || event.startDate;
 
-  if (!isRecurring) {
+  if (!isRecurring && !isMultiDay) {
     pushUndo(appState.doc);
     appState.doc.events.splice(index, 1);
     schedulePersist(appState.doc, 'event-delete', setLastSaved);
@@ -537,7 +587,7 @@ function deleteUserEvent(eventId, occurrenceDate = '') {
     return true;
   }
 
-  const deleteMode = askRecurringDeleteMode();
+  const deleteMode = askSeriesDeleteMode(event);
   if (!deleteMode) return false;
 
   pushUndo(appState.doc);
@@ -548,8 +598,8 @@ function deleteUserEvent(eventId, occurrenceDate = '') {
     return true;
   }
 
-  if (!eventOccursOnDate(event, targetOccurrenceDate) || !deleteSingleRecurringOccurrence(event, targetOccurrenceDate)) {
-    flash('Could not delete the selected recurring occurrence.', 'danger');
+  if (!eventOccursOnDate(event, targetOccurrenceDate) || !deleteSingleEventOccurrence(event, targetOccurrenceDate)) {
+    flash('Could not delete the selected event date.', 'danger');
     return false;
   }
 
@@ -920,11 +970,20 @@ function bindMainUI() {
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();
-    const { eventId, sourceType, occurrenceKey, occurrenceDate } = activeEventContext;
+    const { eventId, sourceType, occurrenceKey, occurrenceDate, seriesKey, seriesSpanDays } = activeEventContext;
     if (sourceType === 'usa-jamaat') {
       if (!occurrenceKey) return;
-      toggleHiddenDate('usaJamaatOccurrences', occurrenceKey);
-      schedulePersist(appState.doc, 'usa-jamaat-hide', setLastSaved);
+      const deleteMode = seriesSpanDays > 1
+        ? askSeriesDeleteMode({ recurrenceType: 'none', startDate: occurrenceDate, endDate: shiftIsoDate(occurrenceDate, seriesSpanDays - 1) })
+        : 'single';
+      if (!deleteMode) return;
+      if (deleteMode === 'all' && seriesKey) {
+        toggleHiddenDate('usaJamaatSeries', seriesKey);
+        schedulePersist(appState.doc, 'usa-jamaat-hide-series', setLastSaved);
+      } else {
+        toggleHiddenDate('usaJamaatOccurrences', occurrenceKey);
+        schedulePersist(appState.doc, 'usa-jamaat-hide', setLastSaved);
+      }
       rerender();
       return;
     }

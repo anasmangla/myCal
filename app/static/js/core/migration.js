@@ -14,6 +14,7 @@ export function migrateLegacyState({ legacyRaw, month, docId, title }) {
   doc.settings.hiddenMeta.holidays = legacy.hiddenMeta?.holidays || [];
   doc.settings.hiddenMeta.islamic = legacy.hiddenMeta?.islamic || [];
   doc.settings.hiddenMeta.usaJamaatOccurrences = legacy.hiddenMeta?.usaJamaatOccurrences || [];
+  doc.settings.hiddenMeta.usaJamaatSeries = legacy.hiddenMeta?.usaJamaatSeries || [];
 
   (legacy.events || []).forEach((event) => doc.events.push(normalizeEvent(event)));
   Object.entries(legacy.styles || {}).forEach(([date, color]) => {
