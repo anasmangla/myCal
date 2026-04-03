@@ -162,6 +162,7 @@
       </div>
 
       <div class="mb-3 no-print d-none" id="flashMessage"></div>
+      <div class="alert alert-warning small mb-3 no-print d-none" id="calendarFitWarning" role="status" aria-live="polite"></div>
 
       <div class="sheet-preview-wrapper" id="sheetPreviewWrapper">
         <div class="calendar-sheet" id="calendarSheet">
@@ -231,6 +232,12 @@
               <input type="hidden" id="editScopeMode" value="all">
               <input type="hidden" id="editSourceEventId" value="">
               <input type="hidden" id="editOccurrenceDate" value="">
+              <input type="hidden" id="editBuiltinSourceType" value="">
+              <input type="hidden" id="editBuiltinHideType" value="">
+              <input type="hidden" id="editBuiltinHideKey" value="">
+              <input type="hidden" id="editBuiltinSeriesKey" value="">
+              <input type="hidden" id="editBuiltinScope" value="">
+              <input type="hidden" id="eventColor" value="">
               <div class="row g-3">
                 <div class="col-12 d-none" id="eventScopeBanner">
                   <div class="alert alert-info small mb-0" id="eventScopeBannerText"></div>
@@ -468,6 +475,8 @@
       <button class="dropdown-item" id="contextClearColor">Clear custom date background color</button>
       <button class="dropdown-item d-none" id="contextAddCellImage">Add image to box</button>
       <button class="dropdown-item d-none" id="contextRemoveCellImages">Remove box images</button>
+      <button class="dropdown-item" id="contextModifyHoliday">Modify U.S. holiday as custom event</button>
+      <button class="dropdown-item" id="contextModifyIslamic">Modify Islamic date as custom event</button>
       <button class="dropdown-item" id="contextToggleHoliday">Hide U.S. holiday on this day</button>
       <button class="dropdown-item" id="contextToggleIslamic">Hide Islamic date on this day</button>
     </div>

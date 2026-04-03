@@ -72,8 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const editScopeModeInput = document.getElementById('editScopeMode');
   const editSourceEventIdInput = document.getElementById('editSourceEventId');
   const editOccurrenceDateInput = document.getElementById('editOccurrenceDate');
+  const editBuiltinSourceTypeInput = document.getElementById('editBuiltinSourceType');
+  const editBuiltinHideTypeInput = document.getElementById('editBuiltinHideType');
+  const editBuiltinHideKeyInput = document.getElementById('editBuiltinHideKey');
+  const editBuiltinSeriesKeyInput = document.getElementById('editBuiltinSeriesKey');
+  const editBuiltinScopeInput = document.getElementById('editBuiltinScope');
   const eventScopeBanner = document.getElementById('eventScopeBanner');
   const eventScopeBannerText = document.getElementById('eventScopeBannerText');
+  const calendarFitWarningEl = document.getElementById('calendarFitWarning');
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
@@ -82,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeEventSeriesKey = '';
   let activeEventSeriesSpanDays = 1;
   let activeEventTitle = '';
+  let calendarFitFrame = 0;
   const hiddenMeta = loadHiddenMeta();
   const defaultThemeSettings = {
     outsideMonthColor: '#f5f5f5',
@@ -216,7 +223,161 @@ document.addEventListener('DOMContentLoaded', () => {
     if (editScopeModeInput) editScopeModeInput.value = 'all';
     if (editSourceEventIdInput) editSourceEventIdInput.value = '';
     if (editOccurrenceDateInput) editOccurrenceDateInput.value = '';
+    if (editBuiltinSourceTypeInput) editBuiltinSourceTypeInput.value = '';
+    if (editBuiltinHideTypeInput) editBuiltinHideTypeInput.value = '';
+    if (editBuiltinHideKeyInput) editBuiltinHideKeyInput.value = '';
+    if (editBuiltinSeriesKeyInput) editBuiltinSeriesKeyInput.value = '';
+    if (editBuiltinScopeInput) editBuiltinScopeInput.value = '';
     setScopedEditBanner('');
+  }
+
+  function builtinEditState() {
+    return {
+      sourceType: editBuiltinSourceTypeInput?.value || '',
+      hideType: editBuiltinHideTypeInput?.value || '',
+      hideKey: editBuiltinHideKeyInput?.value || '',
+      seriesKey: editBuiltinSeriesKeyInput?.value || '',
+      scope: editBuiltinScopeInput?.value || '',
+    };
+  }
+
+  function setBuiltinEditState({ sourceType = '', hideType = '', hideKey = '', seriesKey = '', scope = '', message = '' } = {}) {
+    if (editBuiltinSourceTypeInput) editBuiltinSourceTypeInput.value = sourceType;
+    if (editBuiltinHideTypeInput) editBuiltinHideTypeInput.value = hideType;
+    if (editBuiltinHideKeyInput) editBuiltinHideKeyInput.value = hideKey;
+    if (editBuiltinSeriesKeyInput) editBuiltinSeriesKeyInput.value = seriesKey;
+    if (editBuiltinScopeInput) editBuiltinScopeInput.value = scope;
+    setScopedEditBanner(message);
+  }
+
+  function setCalendarFitWarning(message = '') {
+    if (!calendarFitWarningEl) return;
+    calendarFitWarningEl.textContent = message;
+    calendarFitWarningEl.classList.toggle('d-none', !message);
+  }
+
+  function buildTrackTemplate(needs, totalSpace, { minFactor = 0.82, maxFactor = 1.45 } = {}) {
+    if (!Array.isArray(needs) || !needs.length || !Number.isFinite(totalSpace) || totalSpace <= 0) return '';
+    const base = totalSpace / needs.length;
+    const minTrack = Math.max(1, base * minFactor);
+    const maxTrack = Math.max(minTrack, base * maxFactor);
+    const normalized = needs.map((need) => {
+      const numeric = Number.isFinite(need) && need > 0 ? need : base;
+      return Math.min(maxTrack, Math.max(minTrack, numeric));
+    });
+    const total = normalized.reduce((sum, value) => sum + value, 0) || 1;
+    return normalized.map((value) => `${((value / total) * 100).toFixed(4)}%`).join(' ');
+  }
+
+  function measureCellHeightRequirement(cell) {
+    const measurables = cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip');
+    let required = Math.max(cell.clientHeight || 0, cell.scrollHeight || 0);
+    measurables.forEach((element) => {
+      required += Math.max(0, (element.scrollHeight || 0) - (element.clientHeight || 0));
+    });
+    return required + 4;
+  }
+
+  function measureCellWidthRequirement(cell) {
+    const measurables = cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip');
+    const baseWidth = Math.max(cell.clientWidth || 0, cell.scrollWidth || 0);
+    let required = baseWidth;
+    measurables.forEach((element) => {
+      const overflowWidth = Math.max(0, (element.scrollWidth || 0) - (element.clientWidth || 0));
+      required = Math.max(required, (cell.clientWidth || 0) + overflowWidth);
+    });
+    return required + 2;
+  }
+
+  function cellStillOverflows(cell) {
+    const ownOverflow = (cell.scrollHeight || 0) > ((cell.clientHeight || 0) + 2)
+      || (cell.scrollWidth || 0) > ((cell.clientWidth || 0) + 2);
+    if (ownOverflow) return true;
+    return Array.from(
+      cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip')
+    ).some((element) => (
+      (element.scrollHeight || 0) > ((element.clientHeight || 0) + 2)
+      || (element.scrollWidth || 0) > ((element.clientWidth || 0) + 2)
+    ));
+  }
+
+  function summarizeOverflowDates(dates) {
+    const ordered = Array.from(new Set(dates)).sort();
+    if (!ordered.length) return '';
+    const visible = ordered.slice(0, 4).map((iso) => formatMonthDate(iso));
+    return ordered.length > 4
+      ? `${visible.join(', ')}, and ${ordered.length - 4} more`
+      : visible.join(', ');
+  }
+
+  function applyCalendarAutoFit() {
+    const monthGrid = document.getElementById('calendarBody');
+    const weekdayHeader = document.querySelector('.calendar-grid.weekdays');
+    if (!monthGrid || !weekdayHeader) return;
+    const cells = Array.from(monthGrid.children).filter((cell) => cell.classList.contains('calendar-cell'));
+    if (!cells.length) {
+      setCalendarFitWarning('');
+      return;
+    }
+
+    monthGrid.style.removeProperty('grid-template-columns');
+    monthGrid.style.removeProperty('grid-template-rows');
+    weekdayHeader.style.removeProperty('grid-template-columns');
+    cells.forEach((cell) => {
+      cell.removeAttribute('data-fit-warning');
+      cell.removeAttribute('title');
+    });
+
+    const availableWidth = monthGrid.clientWidth || monthGrid.offsetWidth || 0;
+    const availableHeight = monthGrid.clientHeight || monthGrid.offsetHeight || 0;
+    if (!availableWidth || !availableHeight) {
+      setCalendarFitWarning('');
+      return;
+    }
+
+    const columnNeeds = Array.from({ length: 7 }, () => 0);
+    cells.forEach((cell, index) => {
+      const columnIndex = index % 7;
+      columnNeeds[columnIndex] = Math.max(columnNeeds[columnIndex], measureCellWidthRequirement(cell));
+    });
+    const columnTemplate = buildTrackTemplate(columnNeeds, availableWidth, { minFactor: 0.88, maxFactor: 1.24 });
+    if (columnTemplate) {
+      monthGrid.style.gridTemplateColumns = columnTemplate;
+      weekdayHeader.style.gridTemplateColumns = columnTemplate;
+    }
+
+    const rowNeeds = Array.from({ length: Math.ceil(cells.length / 7) }, () => 0);
+    cells.forEach((cell, index) => {
+      const rowIndex = Math.floor(index / 7);
+      rowNeeds[rowIndex] = Math.max(rowNeeds[rowIndex], measureCellHeightRequirement(cell));
+    });
+    const rowTemplate = buildTrackTemplate(rowNeeds, availableHeight, { minFactor: 0.74, maxFactor: 1.7 });
+    if (rowTemplate) monthGrid.style.gridTemplateRows = rowTemplate;
+
+    const overflowDates = [];
+    cells.forEach((cell) => {
+      if (!cellStillOverflows(cell)) return;
+      cell.dataset.fitWarning = 'true';
+      const iso = cell.dataset.date || '';
+      if (iso) overflowDates.push(iso);
+      cell.title = 'This cell does not fit the printable page yet.';
+    });
+
+    if (overflowDates.length) {
+      setCalendarFitWarning(
+        `These dates still overflow the printable page: ${summarizeOverflowDates(overflowDates)}. Shorten text, hide items, or split crowded days before printing.`
+      );
+      return;
+    }
+    setCalendarFitWarning('');
+  }
+
+  function scheduleCalendarAutoFit() {
+    if (calendarFitFrame) window.cancelAnimationFrame(calendarFitFrame);
+    calendarFitFrame = window.requestAnimationFrame(() => {
+      calendarFitFrame = 0;
+      applyCalendarAutoFit();
+    });
   }
 
   function supportsScopedAction(details, occurrenceDate) {
@@ -477,6 +638,18 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCalendarDecorations();
   });
 
+  document.getElementById('contextModifyHoliday').addEventListener('click', () => {
+    if (!activeDate) return;
+    hideMenus();
+    openBuiltinOverrideEditor(holidayOverrideDraft(activeDate));
+  });
+
+  document.getElementById('contextModifyIslamic').addEventListener('click', () => {
+    if (!activeDate) return;
+    hideMenus();
+    openBuiltinOverrideEditor(islamicOverrideDraft(activeDate));
+  });
+
   colorPicker.addEventListener('input', async () => {
     const result = await saveDateStyle('/date-style', { day: activeDate, background_color: colorPicker.value });
     if (result.ok) window.location.reload();
@@ -493,6 +666,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         toggleHiddenMeta('usaJamaatOccurrences', activeEventOccurrenceKey);
       }
+      renderCalendarDecorations();
+      return;
+    }
+    if (activeEventSourceType === 'holiday' && activeEventOccurrenceDate) {
+      toggleHiddenMeta('holidays', activeEventOccurrenceDate);
       renderCalendarDecorations();
       return;
     }
@@ -575,6 +753,116 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function ensureHiddenMeta(type, value) {
+    if (!type || !value || !hiddenMeta[type]) return;
+    hiddenMeta[type].add(value);
+    persistHiddenMeta();
+  }
+
+  function visibleHolidayLabelForDate(iso) {
+    if (!iso || isHiddenMeta('holidays', iso)) return '';
+    return data.holidays[iso] || '';
+  }
+
+  function visibleIslamicLabelForDate(iso) {
+    if (!iso || isHiddenMeta('islamic', iso)) return '';
+    return islamicLabelForDate(iso);
+  }
+
+  function visibleUsaJamaatSeriesItems(seriesKey) {
+    return flattenEventItems()
+      .filter((item) => item.is_usa_jamaat && item.series_key === seriesKey)
+      .sort((left, right) => String(left.date).localeCompare(String(right.date)));
+  }
+
+  function holidayOverrideDraft(iso) {
+    const title = visibleHolidayLabelForDate(iso);
+    if (!title) return null;
+    return {
+      title,
+      start_date: iso,
+      end_date: iso,
+      start_time: '',
+      audience: 'All',
+      color: '#7c3aed',
+      location: '',
+      notes: 'Customized from the built-in U.S. holiday feed.',
+      recurrence_weekdays: '',
+      recurrence_type: 'none',
+      labels: {},
+      builtinOverride: {
+        sourceType: 'holiday',
+        hideType: 'holidays',
+        hideKey: iso,
+        scope: 'single',
+        message: `Saving will create a custom event and hide the built-in U.S. holiday on ${formatMonthDate(iso)}.`,
+      },
+    };
+  }
+
+  function islamicOverrideDraft(iso) {
+    const title = visibleIslamicLabelForDate(iso);
+    if (!title) return null;
+    return {
+      title,
+      start_date: iso,
+      end_date: iso,
+      start_time: '',
+      audience: 'All',
+      color: '#166534',
+      location: '',
+      notes: 'Customized from the built-in Islamic date label.',
+      recurrence_weekdays: '',
+      recurrence_type: 'none',
+      labels: {},
+      builtinOverride: {
+        sourceType: 'islamic',
+        hideType: 'islamic',
+        hideKey: iso,
+        scope: 'single',
+        message: `Saving will create a custom event and hide the built-in Islamic label on ${formatMonthDate(iso)}.`,
+      },
+    };
+  }
+
+  function usaJamaatOverrideDraft({ occurrenceDate, occurrenceKey, seriesKey, scope }) {
+    const seriesItems = visibleUsaJamaatSeriesItems(seriesKey);
+    const { start, end } = currentMonthBounds();
+    const visibleStart = seriesItems[0]?.date || occurrenceDate || start;
+    const visibleEnd = seriesItems[seriesItems.length - 1]?.date || occurrenceDate || end;
+    const title = seriesItems[0]?.title || activeEventTitle || 'USA Jamaat event';
+    const location = seriesItems.find((item) => item.location)?.location || '';
+    const notes = seriesItems.find((item) => item.notes)?.notes || 'Customized from the built-in USA Jamaat feed.';
+    return {
+      title,
+      start_date: scope === 'all' ? visibleStart : occurrenceDate,
+      end_date: scope === 'all' ? visibleEnd : occurrenceDate,
+      start_time: '',
+      audience: seriesItems[0]?.audience || 'All',
+      color: '#0f766e',
+      location,
+      notes,
+      recurrence_weekdays: '',
+      recurrence_type: 'none',
+      labels: {},
+      builtinOverride: {
+        sourceType: 'usa-jamaat',
+        hideType: scope === 'all' ? 'usaJamaatSeries' : 'usaJamaatOccurrences',
+        hideKey: scope === 'all' ? seriesKey : occurrenceKey,
+        seriesKey,
+        scope,
+        message: scope === 'all'
+          ? 'Saving will create a custom event and hide the built-in USA Jamaat series for this month.'
+          : `Saving will create a custom event and hide the built-in USA Jamaat event on ${formatMonthDate(occurrenceDate)}.`,
+      },
+    };
+  }
+
+  function openBuiltinOverrideEditor(draft) {
+    if (!draft) return;
+    openEventModal(draft, draft.start_date || draft.startDate || '');
+  }
+
   function renderEvents() {
     document.querySelectorAll('[data-events-for]').forEach((container) => {
       const date = container.dataset.eventsFor;
@@ -629,7 +917,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.is_holiday) return;
           if (item.source_type === 'user' && !item.source_event_id) return;
           selectEvent({
             eventId: item.source_event_id || null,
@@ -644,7 +931,6 @@ document.addEventListener('DOMContentLoaded', () => {
           showMenu(eventMenu, event.pageX, event.pageY);
         });
         bindLongPress(chip, ({ x, y }) => {
-          if (item.is_holiday) return;
           if (item.source_type === 'user' && !item.source_event_id) return;
           selectEvent({
             eventId: item.source_event_id || null,
@@ -680,6 +966,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.appendChild(chip);
       });
     });
+    scheduleCalendarAutoFit();
   }
 
   function getIslamicParts(iso) {
@@ -820,6 +1107,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('contextModifyEvent').addEventListener('click', async () => {
     hideMenus();
+    if (activeEventSourceType === 'holiday' && activeEventOccurrenceDate) {
+      openBuiltinOverrideEditor(holidayOverrideDraft(activeEventOccurrenceDate));
+      return;
+    }
+    if (activeEventSourceType === 'usa-jamaat') {
+      if (!activeEventOccurrenceDate) return;
+      const seriesItems = visibleUsaJamaatSeriesItems(activeEventSeriesKey);
+      const startDate = seriesItems[0]?.date || activeEventOccurrenceDate;
+      const endDate = seriesItems[seriesItems.length - 1]?.date || activeEventOccurrenceDate;
+      const scope = activeEventSeriesSpanDays > 1
+        ? askActionScope(
+          {
+            recurrence_type: 'none',
+            start_date: startDate,
+            end_date: endDate,
+          },
+          'edit'
+        )
+        : 'single';
+      if (!scope) return;
+      openBuiltinOverrideEditor(
+        usaJamaatOverrideDraft({
+          occurrenceDate: activeEventOccurrenceDate,
+          occurrenceKey: activeEventOccurrenceKey,
+          seriesKey: activeEventSeriesKey,
+          scope,
+        })
+      );
+      return;
+    }
     if (activeEventSourceType !== 'user' || !activeEventId) return;
     await openEventById(activeEventId, activeEventOccurrenceDate || '');
   });
@@ -1063,8 +1380,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupCalendarScaling() {
     scaleCalendar();
-    window.addEventListener('resize', scaleCalendar, { passive: true });
-    window.addEventListener('load', scaleCalendar);
+    window.addEventListener('resize', () => {
+      scaleCalendar();
+      scheduleCalendarAutoFit();
+    }, { passive: true });
+    window.addEventListener('load', () => {
+      scaleCalendar();
+      scheduleCalendarAutoFit();
+    });
   }
 
   function setupExportImage() {
@@ -1197,14 +1520,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (error) {
         event.preventDefault();
         showValidation(error);
+        return;
+      }
+      const builtinOverride = builtinEditState();
+      if (builtinOverride.sourceType && builtinOverride.hideType && builtinOverride.hideKey) {
+        ensureHiddenMeta(builtinOverride.hideType, builtinOverride.hideKey);
       }
     });
   }
 
   function openEventModal(payload, occurrenceDate = '') {
     resetScopedEditState();
+    const builtinOverride = payload?.builtinOverride || null;
     const requestedOccurrenceDate = occurrenceDate || payload.start_date || payload.startDate || '';
     let scopedPayload = payload;
+    if (builtinOverride?.sourceType) setBuiltinEditState(builtinOverride);
 
     if (payload.id && supportsScopedAction(payload, requestedOccurrenceDate)) {
       const editMode = askActionScope(payload, 'edit');
@@ -1536,17 +1866,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function syncDateMenuLabels() {
     const addEventButton = document.getElementById('contextAddEvent');
+    const modifyHolidayButton = document.getElementById('contextModifyHoliday');
+    const modifyIslamicButton = document.getElementById('contextModifyIslamic');
     const holidayButton = document.getElementById('contextToggleHoliday');
     const islamicButton = document.getElementById('contextToggleIslamic');
     const selectableDate = isSelectableDate(activeDate);
     const hasHoliday = Boolean(activeDate && data.holidays[activeDate]);
-    const hasIslamic = Boolean(selectableDate && (data.islamicMode || 'partial') !== 'off');
+    const hasIslamic = Boolean(activeDate && islamicLabelForDate(activeDate));
     const holidayHidden = Boolean(activeDate && isHiddenMeta('holidays', activeDate));
     const islamicHidden = Boolean(activeDate && isHiddenMeta('islamic', activeDate));
 
     addEventButton.classList.toggle('d-none', !selectableDate);
+    modifyHolidayButton.classList.toggle('d-none', !selectableDate);
+    modifyIslamicButton.classList.toggle('d-none', !selectableDate);
     holidayButton.classList.toggle('d-none', !selectableDate);
     islamicButton.classList.toggle('d-none', !selectableDate);
+    modifyHolidayButton.disabled = !selectableDate || !hasHoliday || holidayHidden;
+    modifyIslamicButton.disabled = !selectableDate || !hasIslamic || islamicHidden;
     holidayButton.disabled = !selectableDate || !hasHoliday;
     islamicButton.disabled = !selectableDate || !hasIslamic;
     holidayButton.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
@@ -1558,17 +1894,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const moveButton = document.getElementById('contextMoveEvent');
     const deleteButton = document.getElementById('contextDeleteEvent');
     const isUsaJamaat = activeEventSourceType === 'usa-jamaat';
-    modifyButton.classList.toggle('d-none', isUsaJamaat);
-    moveButton.classList.toggle('d-none', isUsaJamaat);
+    const isHoliday = activeEventSourceType === 'holiday';
+    const isUser = activeEventSourceType === 'user';
+    modifyButton.classList.toggle('d-none', false);
+    modifyButton.textContent = (isUsaJamaat || isHoliday) ? 'Modify as custom event' : 'Modify event';
+    moveButton.classList.toggle('d-none', !isUser);
     deleteButton.textContent = isUsaJamaat
       ? `Hide USA Jamaat event on ${activeEventOccurrenceDate || 'this day'}`
-      : 'Remove event';
+      : isHoliday
+        ? `Hide U.S. holiday on ${activeEventOccurrenceDate || 'this day'}`
+        : 'Remove event';
   }
 
   function renderCalendarDecorations() {
     applyDateStyles();
     renderEvents();
     renderHiddenItemsUI();
+    scheduleCalendarAutoFit();
   }
 
   const deleteEventBtn = document.getElementById('deleteEventBtn');

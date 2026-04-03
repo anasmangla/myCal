@@ -264,8 +264,13 @@ body {
 .weekday-row,
 .month-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: var(--calendar-column-template, repeat(7, minmax(0, 1fr)));
   min-width: 0;
+}
+
+.month-grid,
+.day-grid {
+  grid-template-rows: var(--calendar-row-template, repeat(6, minmax(0, 1fr)));
 }
 
 .weekday-row {
@@ -400,6 +405,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  flex: 0 0 auto;
 }
 
 .calendar-meta-line {
@@ -417,12 +423,12 @@ body {
 .events,
 .event-list {
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   font-size: var(--calendar-event-font-size);
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
   gap: 0.16rem;
 }
 
@@ -576,8 +582,8 @@ body {
 
 .cell-note-preview {
   margin-top: 0.2rem;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
   font-size: var(--calendar-note-font-size);
   line-height: 1.2;
   white-space: pre-wrap;
@@ -589,10 +595,11 @@ body {
 
 .outside-month-editor-shell {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   flex-direction: column;
   gap: 0.3rem;
+  overflow: hidden;
 }
 
 .outside-month-editor-toolbar {
@@ -620,7 +627,7 @@ body {
 }
 
 .outside-month-editor {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   width: 100%;
   resize: none;
@@ -632,8 +639,14 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
-  overflow: auto;
+  overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+@media screen {
+  .calendar-cell[data-fit-warning="true"] {
+    box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.68);
+  }
 }
 
 .outside-month-editor:focus {

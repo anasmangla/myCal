@@ -195,6 +195,7 @@
   </div>
   {% endif %}
   {% endwith %}
+  <div class="alert alert-warning small mb-3 no-print d-none" id="calendarFitWarning" role="status" aria-live="polite"></div>
 
   <div class="calendar-scale-wrapper" id="calendarScaleWrapper">
     <div class="calendar-page" id="calendarCapture">
@@ -250,6 +251,11 @@
           <input type="hidden" name="source_event_id" id="editSourceEventId" value="">
           <input type="hidden" name="edit_mode" id="editScopeMode" value="all">
           <input type="hidden" name="occurrence_date" id="editOccurrenceDate" value="">
+          <input type="hidden" id="editBuiltinSourceType" value="">
+          <input type="hidden" id="editBuiltinHideType" value="">
+          <input type="hidden" id="editBuiltinHideKey" value="">
+          <input type="hidden" id="editBuiltinSeriesKey" value="">
+          <input type="hidden" id="editBuiltinScope" value="">
           <input type="hidden" name="return_year" value="{{ selected_year }}">
           <input type="hidden" name="return_month" value="{{ selected_month }}">
           <input type="hidden" name="return_holidays" value="{{ 1 if include_holidays else 0 }}">
@@ -463,6 +469,8 @@
   <button class="dropdown-item" id="contextAddEvent">Add event</button>
   <button class="dropdown-item" id="contextChangeColor">Change date background color</button>
   <button class="dropdown-item" id="contextClearColor">Clear custom date background color</button>
+  <button class="dropdown-item" id="contextModifyHoliday">Modify U.S. holiday as custom event</button>
+  <button class="dropdown-item" id="contextModifyIslamic">Modify Islamic date as custom event</button>
   <button class="dropdown-item" id="contextToggleHoliday">Hide U.S. holiday on this day</button>
   <button class="dropdown-item" id="contextToggleIslamic">Hide Islamic date on this day</button>
 </div>

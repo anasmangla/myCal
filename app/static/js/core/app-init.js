@@ -23,6 +23,7 @@ let activeDateContext = '';
 let activeEventContext = { eventId: '', occurrenceDate: '', sourceType: 'user', occurrenceKey: '', seriesKey: '', seriesSpanDays: 1, title: '' };
 let pendingCellEditorFocus = false;
 let activeDraggedCellImage = null;
+let calendarFitFrame = 0;
 const FONT_PRESETS = {
   system: '"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
   trebuchet: '"Trebuchet MS", "Segoe UI", sans-serif',
@@ -153,7 +154,170 @@ function resetEventScopeState() {
   document.getElementById('editScopeMode').value = 'all';
   document.getElementById('editSourceEventId').value = '';
   document.getElementById('editOccurrenceDate').value = '';
+  document.getElementById('editBuiltinSourceType').value = '';
+  document.getElementById('editBuiltinHideType').value = '';
+  document.getElementById('editBuiltinHideKey').value = '';
+  document.getElementById('editBuiltinSeriesKey').value = '';
+  document.getElementById('editBuiltinScope').value = '';
   setEventScopeBanner('');
+}
+
+function builtinEditState() {
+  return {
+    sourceType: document.getElementById('editBuiltinSourceType').value || '',
+    hideType: document.getElementById('editBuiltinHideType').value || '',
+    hideKey: document.getElementById('editBuiltinHideKey').value || '',
+    seriesKey: document.getElementById('editBuiltinSeriesKey').value || '',
+    scope: document.getElementById('editBuiltinScope').value || '',
+  };
+}
+
+function setBuiltinEditState({ sourceType = '', hideType = '', hideKey = '', seriesKey = '', scope = '', message = '' } = {}) {
+  document.getElementById('editBuiltinSourceType').value = sourceType;
+  document.getElementById('editBuiltinHideType').value = hideType;
+  document.getElementById('editBuiltinHideKey').value = hideKey;
+  document.getElementById('editBuiltinSeriesKey').value = seriesKey;
+  document.getElementById('editBuiltinScope').value = scope;
+  setEventScopeBanner(message);
+}
+
+function setCalendarFitWarning(message = '') {
+  const alert = document.getElementById('calendarFitWarning');
+  if (!alert) return;
+  alert.textContent = message;
+  alert.classList.toggle('d-none', !message);
+}
+
+function buildTrackTemplate(needs, totalSpace, { minFactor = 0.82, maxFactor = 1.45 } = {}) {
+  if (!Array.isArray(needs) || !needs.length || !Number.isFinite(totalSpace) || totalSpace <= 0) return '';
+  const base = totalSpace / needs.length;
+  const minTrack = Math.max(1, base * minFactor);
+  const maxTrack = Math.max(minTrack, base * maxFactor);
+  const normalized = needs.map((need) => {
+    const numeric = Number.isFinite(need) && need > 0 ? need : base;
+    return Math.min(maxTrack, Math.max(minTrack, numeric));
+  });
+  const total = normalized.reduce((sum, value) => sum + value, 0) || 1;
+  return normalized.map((value) => `${((value / total) * 100).toFixed(4)}%`).join(' ');
+}
+
+function measureCellHeightRequirement(cell) {
+  const measurables = cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip');
+  let required = Math.max(cell.clientHeight || 0, cell.scrollHeight || 0);
+  measurables.forEach((element) => {
+    required += Math.max(0, (element.scrollHeight || 0) - (element.clientHeight || 0));
+  });
+  return required + 4;
+}
+
+function measureCellWidthRequirement(cell) {
+  const measurables = cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip');
+  const baseWidth = Math.max(cell.clientWidth || 0, cell.scrollWidth || 0);
+  let required = baseWidth;
+  measurables.forEach((element) => {
+    const overflowWidth = Math.max(0, (element.scrollWidth || 0) - (element.clientWidth || 0));
+    required = Math.max(required, (cell.clientWidth || 0) + overflowWidth);
+  });
+  return required + 2;
+}
+
+function syncOutsideMonthEditorHeights() {
+  document.querySelectorAll('.outside-month-editor').forEach((textarea) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 72)}px`;
+  });
+}
+
+function cellStillOverflows(cell) {
+  const ownOverflow = (cell.scrollHeight || 0) > ((cell.clientHeight || 0) + 2)
+    || (cell.scrollWidth || 0) > ((cell.clientWidth || 0) + 2);
+  if (ownOverflow) return true;
+  return Array.from(
+    cell.querySelectorAll('.holiday-pill, .event-list, .events, .cell-note-preview, .outside-month-editor, .outside-month-editor-shell, .cell-image-strip')
+  ).some((element) => (
+    (element.scrollHeight || 0) > ((element.clientHeight || 0) + 2)
+    || (element.scrollWidth || 0) > ((element.clientWidth || 0) + 2)
+  ));
+}
+
+function summarizeOverflowDates(dates) {
+  const ordered = Array.from(new Set(dates)).sort();
+  if (!ordered.length) return '';
+  const visible = ordered.slice(0, 4).map((iso) => formatMonthDate(iso));
+  return ordered.length > 4
+    ? `${visible.join(', ')}, and ${ordered.length - 4} more`
+    : visible.join(', ');
+}
+
+function applyCalendarAutoFit() {
+  const monthGrid = document.getElementById('calendarBody');
+  const weekdayHeader = document.getElementById('weekdayHeader');
+  if (!monthGrid || !weekdayHeader) return;
+  const cells = Array.from(monthGrid.children).filter((cell) => cell.classList.contains('calendar-cell'));
+  if (!cells.length) {
+    setCalendarFitWarning('');
+    return;
+  }
+
+  syncOutsideMonthEditorHeights();
+  monthGrid.style.removeProperty('grid-template-columns');
+  monthGrid.style.removeProperty('grid-template-rows');
+  weekdayHeader.style.removeProperty('grid-template-columns');
+  cells.forEach((cell) => {
+    cell.removeAttribute('data-fit-warning');
+    cell.removeAttribute('title');
+  });
+
+  const availableWidth = monthGrid.clientWidth || monthGrid.offsetWidth || 0;
+  const availableHeight = monthGrid.clientHeight || monthGrid.offsetHeight || 0;
+  if (!availableWidth || !availableHeight) {
+    setCalendarFitWarning('');
+    return;
+  }
+
+  const columnNeeds = Array.from({ length: 7 }, () => 0);
+  cells.forEach((cell, index) => {
+    const columnIndex = index % 7;
+    columnNeeds[columnIndex] = Math.max(columnNeeds[columnIndex], measureCellWidthRequirement(cell));
+  });
+  const columnTemplate = buildTrackTemplate(columnNeeds, availableWidth, { minFactor: 0.88, maxFactor: 1.24 });
+  if (columnTemplate) {
+    monthGrid.style.gridTemplateColumns = columnTemplate;
+    weekdayHeader.style.gridTemplateColumns = columnTemplate;
+  }
+
+  const rowNeeds = Array.from({ length: Math.ceil(cells.length / 7) }, () => 0);
+  cells.forEach((cell, index) => {
+    const rowIndex = Math.floor(index / 7);
+    rowNeeds[rowIndex] = Math.max(rowNeeds[rowIndex], measureCellHeightRequirement(cell));
+  });
+  const rowTemplate = buildTrackTemplate(rowNeeds, availableHeight, { minFactor: 0.74, maxFactor: 1.7 });
+  if (rowTemplate) monthGrid.style.gridTemplateRows = rowTemplate;
+
+  const overflowDates = [];
+  cells.forEach((cell) => {
+    if (!cellStillOverflows(cell)) return;
+    cell.dataset.fitWarning = 'true';
+    const iso = cell.dataset.date || '';
+    if (iso) overflowDates.push(iso);
+    cell.title = 'This cell does not fit the printable page yet.';
+  });
+
+  if (overflowDates.length) {
+    setCalendarFitWarning(
+      `These dates still overflow the printable page: ${summarizeOverflowDates(overflowDates)}. Shorten text, hide items, or split crowded days before printing.`
+    );
+    return;
+  }
+  setCalendarFitWarning('');
+}
+
+function scheduleCalendarAutoFit() {
+  if (calendarFitFrame) window.cancelAnimationFrame(calendarFitFrame);
+  calendarFitFrame = window.requestAnimationFrame(() => {
+    calendarFitFrame = 0;
+    applyCalendarAutoFit();
+  });
 }
 
 function supportsScopedAction(event, occurrenceDate) {
@@ -410,10 +574,12 @@ function rerender() {
     onCellTextInput: ({ date, value }) => {
       updateCellText({ state: appState, date, value });
       schedulePersist(appState.doc, 'cell-note-inline', setLastSaved);
+      scheduleCalendarAutoFit();
     },
     onCellTextStyleChange: ({ date, patch }) => {
       applyCellTextStylePatch({ state: appState, date, patch });
       schedulePersist(appState.doc, 'cell-text-style', setLastSaved);
+      scheduleCalendarAutoFit();
     },
     onDateContext: ({ date, x, y }) => {
       activeDateContext = date;
@@ -479,6 +645,7 @@ function rerender() {
     }
   }
   pendingCellEditorFocus = false;
+  scheduleCalendarAutoFit();
 }
 
 function getThemeSettings() {
@@ -620,26 +787,139 @@ function setHiddenDateSet(type, values) {
   hiddenMeta[type] = Array.from(values);
 }
 
+function ensureHiddenDate(type, value) {
+  if (!value) return;
+  const values = hiddenDateSet(type);
+  if (values.has(value)) return;
+  values.add(value);
+  setHiddenDateSet(type, values);
+}
+
+function visibleHolidayLabelForDate(date) {
+  if (!date || !appState.doc.settings.showUSHolidays || hiddenDateSet('holidays').has(date)) return '';
+  return simpleUSHolidays(appState.view.year, appState.view.month).get(date) || '';
+}
+
+function visibleIslamicLabelForDate(date) {
+  if (!date || !appState.doc.settings.showIslamicDates || hiddenDateSet('islamic').has(date)) return '';
+  return buildIslamicLabels(date).map((item) => item.text).join(' / ');
+}
+
+function holidayOverrideDraft(date) {
+  const title = visibleHolidayLabelForDate(date);
+  if (!title) return null;
+  return {
+    title,
+    startDate: date,
+    endDate: date,
+    startTime: '',
+    allDay: true,
+    audience: 'All',
+    location: '',
+    notes: 'Customized from the built-in U.S. holiday feed.',
+    color: '#7c3aed',
+    labels: {},
+    builtinOverride: {
+      sourceType: 'holiday',
+      hideType: 'holidays',
+      hideKey: date,
+      scope: 'single',
+      message: `Saving will create a custom event and hide the built-in U.S. holiday on ${formatMonthDate(date)}.`,
+    },
+  };
+}
+
+function islamicOverrideDraft(date) {
+  const title = visibleIslamicLabelForDate(date);
+  if (!title) return null;
+  return {
+    title,
+    startDate: date,
+    endDate: date,
+    startTime: '',
+    allDay: true,
+    audience: 'All',
+    location: '',
+    notes: 'Customized from the built-in Islamic date label.',
+    color: '#166534',
+    labels: {},
+    builtinOverride: {
+      sourceType: 'islamic',
+      hideType: 'islamic',
+      hideKey: date,
+      scope: 'single',
+      message: `Saving will create a custom event and hide the built-in Islamic label on ${formatMonthDate(date)}.`,
+    },
+  };
+}
+
+function usaJamaatOverrideDraft({ occurrenceDate, seriesKey, occurrenceKey, scope }) {
+  const source = usaJamaatSeriesLookup.get(seriesKey || '');
+  const { start, end } = monthBoundsIso();
+  const isWholeSeries = scope === 'all' && source;
+  const startDate = isWholeSeries
+    ? (source.startDate < start ? start : source.startDate)
+    : occurrenceDate;
+  const endDate = isWholeSeries
+    ? (source.endDate > end ? end : source.endDate)
+    : occurrenceDate;
+  return {
+    title: source?.title || activeEventContext.title || 'USA Jamaat event',
+    startDate,
+    endDate,
+    startTime: '',
+    allDay: true,
+    audience: source?.audience || 'All',
+    location: source?.location || '',
+    notes: source?.notes || 'Customized from the built-in USA Jamaat feed.',
+    color: '#0f766e',
+    labels: {},
+    builtinOverride: {
+      sourceType: 'usa-jamaat',
+      hideType: scope === 'all' ? 'usaJamaatSeries' : 'usaJamaatOccurrences',
+      hideKey: scope === 'all' ? (seriesKey || '') : (occurrenceKey || ''),
+      seriesKey: seriesKey || '',
+      scope,
+      message: scope === 'all'
+        ? 'Saving will create a custom event and hide the built-in USA Jamaat series for this month.'
+        : `Saving will create a custom event and hide the built-in USA Jamaat event on ${formatMonthDate(occurrenceDate)}.`,
+    },
+  };
+}
+
+function openBuiltinOverrideEditor(draft) {
+  if (!draft) return;
+  openEventModal(draft);
+}
+
 function updateDateContextLabels(date) {
   const addEventBtn = document.getElementById('contextAddEvent');
   const addCellImageBtn = document.getElementById('contextAddCellImage');
   const removeCellImagesBtn = document.getElementById('contextRemoveCellImages');
+  const modifyHolidayBtn = document.getElementById('contextModifyHoliday');
+  const modifyIslamicBtn = document.getElementById('contextModifyIslamic');
   const holidayBtn = document.getElementById('contextToggleHoliday');
   const islamicBtn = document.getElementById('contextToggleIslamic');
   const inVisibleMonth = !isOutsideVisibleMonth(date);
   const outsideMonth = !inVisibleMonth;
   const holidayHidden = hiddenDateSet('holidays').has(date);
   const islamicHidden = hiddenDateSet('islamic').has(date);
+  const holidayLabel = visibleHolidayLabelForDate(date);
+  const islamicLabel = visibleIslamicLabelForDate(date);
   const activeCell = appState.doc.cells[date];
   const imageCount = activeCell?.attachments?.length || 0;
   addEventBtn.classList.toggle('d-none', !inVisibleMonth);
   addCellImageBtn.classList.toggle('d-none', !outsideMonth);
   removeCellImagesBtn.classList.toggle('d-none', !outsideMonth);
+  modifyHolidayBtn.classList.toggle('d-none', !inVisibleMonth);
+  modifyIslamicBtn.classList.toggle('d-none', !inVisibleMonth);
   holidayBtn.classList.toggle('d-none', !inVisibleMonth);
   islamicBtn.classList.toggle('d-none', !inVisibleMonth);
   addCellImageBtn.disabled = !outsideMonth;
   removeCellImagesBtn.disabled = !outsideMonth || imageCount === 0;
   removeCellImagesBtn.textContent = imageCount > 1 ? 'Remove all box images' : 'Remove box image';
+  modifyHolidayBtn.disabled = !holidayLabel;
+  modifyIslamicBtn.disabled = !islamicLabel;
   holidayBtn.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
   islamicBtn.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
   holidayBtn.disabled = !inVisibleMonth || !appState.doc.settings.showUSHolidays;
@@ -651,8 +931,10 @@ function updateEventContextLabels() {
   const moveBtn = document.getElementById('contextMoveEvent');
   const deleteBtn = document.getElementById('contextDeleteEvent');
   const isUsaJamaat = activeEventContext.sourceType === 'usa-jamaat';
-  modifyBtn.classList.toggle('d-none', isUsaJamaat);
-  moveBtn.classList.toggle('d-none', isUsaJamaat);
+  const isUserEvent = activeEventContext.sourceType === 'user';
+  modifyBtn.classList.toggle('d-none', false);
+  modifyBtn.textContent = isUsaJamaat ? 'Modify as custom event' : 'Modify event';
+  moveBtn.classList.toggle('d-none', !isUserEvent);
   deleteBtn.textContent = isUsaJamaat ? 'Hide USA Jamaat event on this day' : 'Remove event';
 }
 
@@ -863,6 +1145,7 @@ function setLastSaved(ts) {
 }
 
 function openEventModal(payload) {
+  const builtinOverride = typeof payload === 'object' ? (payload?.builtinOverride || null) : null;
   const requestedOccurrenceDate = typeof payload === 'object'
     ? (payload.occurrenceDate || payload.occurrence_date || '')
     : '';
@@ -874,6 +1157,7 @@ function openEventModal(payload) {
   resetEventScopeState();
   let occurrenceDate = requestedOccurrenceDate || sourceEvent.startDate || sourceEvent.start_date || '';
   let modalEvent = sourceEvent;
+  if (builtinOverride?.sourceType) setBuiltinEditState(builtinOverride);
 
   if (sourceEvent.id && supportsScopedAction(sourceEvent, occurrenceDate)) {
     const editMode = askSeriesActionMode(sourceEvent, 'edit');
@@ -896,6 +1180,7 @@ function openEventModal(payload) {
   document.getElementById('location').value = modalEvent.location || '';
   document.getElementById('audience').value = modalEvent.audience || 'Unspecified';
   document.getElementById('notes').value = modalEvent.notes || '';
+  document.getElementById('eventColor').value = modalEvent.color || '';
   document.querySelectorAll('#weekdayCheckboxes input').forEach((cb) => { cb.checked = (modalEvent.recurrenceWeekdays || []).includes(cb.value); });
   syncRecurrenceTypeFromWeekdays();
   document.getElementById('deleteEventBtn').classList.toggle('d-none', !modalEvent.id);
@@ -988,6 +1273,8 @@ function bindMainUI() {
     const editScopeMode = document.getElementById('editScopeMode').value;
     const sourceEventId = document.getElementById('editSourceEventId').value;
     const occurrenceDate = document.getElementById('editOccurrenceDate').value;
+    const builtinOverride = builtinEditState();
+    const isBuiltinOverride = Boolean(builtinOverride.sourceType && builtinOverride.hideType && builtinOverride.hideKey);
     const payload = normalizeEvent({
       id: document.getElementById('eventId').value || uuid(),
       title: document.getElementById('title').value.trim(),
@@ -998,6 +1285,7 @@ function bindMainUI() {
       location: document.getElementById('location').value.trim(),
       audience: document.getElementById('audience').value,
       notes: document.getElementById('notes').value.trim(),
+      color: document.getElementById('eventColor').value || null,
       recurrenceType: document.getElementById('recurrenceType').value,
       recurrenceWeekdays: Array.from(document.querySelectorAll('#weekdayCheckboxes input:checked')).map((cb) => cb.value),
     });
@@ -1015,11 +1303,16 @@ function bindMainUI() {
       appState.doc.events.push({ ...payload, id: uuid() });
     } else {
       pushUndo(appState.doc);
-      const idx = appState.doc.events.findIndex((e) => e.id === payload.id);
-      if (idx >= 0) appState.doc.events[idx] = payload;
-      else appState.doc.events.push(payload);
+      if (isBuiltinOverride) {
+        ensureHiddenDate(builtinOverride.hideType, builtinOverride.hideKey);
+        appState.doc.events.push({ ...payload, id: uuid() });
+      } else {
+        const idx = appState.doc.events.findIndex((e) => e.id === payload.id);
+        if (idx >= 0) appState.doc.events[idx] = payload;
+        else appState.doc.events.push(payload);
+      }
     }
-    schedulePersist(appState.doc, 'event', setLastSaved);
+    schedulePersist(appState.doc, isBuiltinOverride ? 'event-builtin-override' : 'event', setLastSaved);
     resetEventScopeState();
     eventModal.hide();
     rerender();
@@ -1263,8 +1556,42 @@ function bindMainUI() {
     schedulePersist(appState.doc, 'settings', setLastSaved);
     rerender();
   });
+  document.getElementById('contextModifyHoliday').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    openBuiltinOverrideEditor(holidayOverrideDraft(activeDateContext));
+  });
+  document.getElementById('contextModifyIslamic').addEventListener('click', () => {
+    hideMenus();
+    if (!activeDateContext) return;
+    openBuiltinOverrideEditor(islamicOverrideDraft(activeDateContext));
+  });
   document.getElementById('contextModifyEvent').addEventListener('click', () => {
     hideMenus();
+    if (activeEventContext.sourceType === 'usa-jamaat') {
+      if (!activeEventContext.occurrenceDate) return;
+      const series = usaJamaatSeriesLookup.get(activeEventContext.seriesKey || '');
+      const scope = series && getSpanDays(series.startDate, series.endDate) > 1
+        ? askSeriesActionMode(
+          {
+            recurrenceType: 'none',
+            startDate: series.startDate,
+            endDate: series.endDate,
+          },
+          'edit'
+        )
+        : 'single';
+      if (!scope) return;
+      openBuiltinOverrideEditor(
+        usaJamaatOverrideDraft({
+          occurrenceDate: activeEventContext.occurrenceDate,
+          occurrenceKey: activeEventContext.occurrenceKey,
+          seriesKey: activeEventContext.seriesKey,
+          scope,
+        })
+      );
+      return;
+    }
     if (!activeEventContext.eventId) return;
     openEventModal({ eventId: activeEventContext.eventId, occurrenceDate: activeEventContext.occurrenceDate });
   });
@@ -1318,6 +1645,8 @@ function bindMainUI() {
     menu.addEventListener('contextmenu', (event) => event.preventDefault());
     menu.addEventListener('click', (event) => event.stopPropagation());
   });
+  window.addEventListener('resize', scheduleCalendarAutoFit, { passive: true });
+  window.addEventListener('load', scheduleCalendarAutoFit);
   renderUnscheduled();
 }
 
