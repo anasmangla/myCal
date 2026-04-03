@@ -6,7 +6,7 @@ from datetime import date, time
 from io import BytesIO
 
 from app import create_app, db
-from app.calendar_utils import build_month_grid, build_week_metadata
+from app.calendar_utils import build_month_grid, build_week_metadata, month_context
 from app.event_utils import ValidationError, parse_event_form
 from app.models import Event
 from app.routes import _build_event_from_import
@@ -176,7 +176,7 @@ class BackendRegressionTests(unittest.TestCase):
             )
             db.session.commit()
 
-        response = self.client.get('/data/export.ics?month_year=2026-04&holidays=0')
+        response = self.client.get('/data/export.ics?month_year=2026-04&holidays=0&usa_jamaat=0')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'text/calendar')
 
@@ -187,6 +187,24 @@ class BackendRegressionTests(unittest.TestCase):
         self.assertIn('DTEND;VALUE=DATE:20260411', content)
         self.assertIn('DTSTART:20260415T183000', content)
         self.assertNotIn('20260501', content)
+
+    def test_month_context_includes_usa_jamaat_feed_when_enabled(self) -> None:
+        with self.app.app_context():
+            enabled = month_context(2026, 1, include_holidays=False, include_usa_jamaat=True)
+            disabled = month_context(2026, 1, include_holidays=False, include_usa_jamaat=False)
+
+        january_occurrences = enabled['occurrences'].get('2026-01-03', [])
+        self.assertTrue(any(item.get('is_usa_jamaat') for item in january_occurrences))
+        self.assertTrue(any('Quran Talks' in item.get('title', '') for item in january_occurrences))
+        self.assertEqual(disabled['occurrences'].get('2026-01-03', []), [])
+
+    def test_export_ics_can_include_usa_jamaat_feed(self) -> None:
+        response = self.client.get('/data/export.ics?month_year=2026-01&holidays=0&usa_jamaat=1')
+        self.assertEqual(response.status_code, 200)
+
+        content = response.data.decode('utf-8')
+        self.assertIn("SUMMARY:New Year's Day", content)
+        self.assertIn('SUMMARY:Quran Talks - 7:00 PM', content)
 
 
 if __name__ == '__main__':

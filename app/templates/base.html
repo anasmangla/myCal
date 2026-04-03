@@ -21,6 +21,7 @@
         selectedMonth: {{ selected_month }},
         selectedYear: {{ selected_year }},
         includeHolidays: {{ 'true' if include_holidays else 'false' }},
+        includeUsaJamaat: {{ 'true' if include_usa_jamaat else 'false' }},
         includeIslamic: {{ 'true' if include_islamic else 'false' }},
         islamicMode: {{ islamic_mode|tojson }},
       };

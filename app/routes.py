@@ -19,6 +19,7 @@ from .calendar_utils import (
 )
 from .event_utils import ValidationError, parse_event_form
 from .models import DateStyle, Event, EventDayLabel
+from .usa_jamaat_calendar import usa_jamaat_events_for_month
 
 bp = Blueprint('calendar', __name__)
 
@@ -55,7 +56,8 @@ def index():
     if islamic_mode not in {'off', 'full', 'partial'}:
         islamic_mode = 'partial'
     include_islamic = islamic_mode != 'off'
-    context = month_context(year, month, include_holidays)
+    include_usa_jamaat = request.args.get('usa_jamaat', '1') == '1'
+    context = month_context(year, month, include_holidays, include_usa_jamaat)
     selected_month_start = date(year, month, 1)
     selected_month_end = _add_months(selected_month_start, 1) - timedelta(days=1)
     month_year_options = []
@@ -79,6 +81,7 @@ def index():
         month_year_options=month_year_options,
         month_names=MONTH_NAMES,
         include_holidays=include_holidays,
+        include_usa_jamaat=include_usa_jamaat,
         islamic_mode=islamic_mode,
         include_islamic=include_islamic,
         audience_choices=AUDIENCE_CHOICES,
@@ -358,16 +361,27 @@ def export_ics():
     year, month = _export_month()
     month_start = date(year, month, 1)
     month_end = _add_months(month_start, 1) - timedelta(days=1)
+    include_usa_jamaat = request.args.get('usa_jamaat', '1') == '1'
     events = (
         Event.query
         .filter(Event.end_date >= month_start, Event.start_date <= month_end)
         .order_by(Event.start_date.asc(), Event.id.asc())
         .all()
     )
-    content = _build_ics_calendar(
-        _visible_ics_occurrences(events, month_start, month_end),
-        f'{MONTH_NAMES[month - 1]} {year}',
-    )
+    rows = _visible_ics_occurrences(events, month_start, month_end)
+    if include_usa_jamaat:
+        rows.extend(_visible_usa_jamaat_ics_occurrences(month_start, month_end))
+        rows.sort(
+            key=lambda item: (
+                item['date'],
+                item.get('source_order', 2),
+                not item['all_day'],
+                item['start_time'] or time.max,
+                item['summary'],
+                str(item['event_id']),
+            )
+        )
+    content = _build_ics_calendar(rows, f'{MONTH_NAMES[month - 1]} {year}')
     filename = f'mycal-{year}-{month:02d}.ics'
     return send_file(
         BytesIO(content.encode('utf-8')),
@@ -555,6 +569,7 @@ def _visible_ics_occurrences(events: list[Event], visible_start: date, visible_e
                         'location': event.location,
                         'audience': event.audience,
                         'notes': event.notes,
+                        'source_order': 2,
                     }
                 )
             continue
@@ -576,6 +591,7 @@ def _visible_ics_occurrences(events: list[Event], visible_start: date, visible_e
                         'location': event.location,
                         'audience': event.audience,
                         'notes': event.notes,
+                        'source_order': 2,
                     }
                 )
             current_day += timedelta(days=1)
@@ -589,6 +605,30 @@ def _visible_ics_occurrences(events: list[Event], visible_start: date, visible_e
             item['event_id'],
         )
     )
+    return rows
+
+
+def _visible_usa_jamaat_ics_occurrences(visible_start: date, visible_end: date) -> list[dict]:
+    rows: list[dict] = []
+    for event in usa_jamaat_events_for_month(visible_start, visible_end):
+        current_day = max(event['start_date'], visible_start)
+        recurrence_end = min(event['end_date'], visible_end)
+        while current_day <= recurrence_end:
+            rows.append(
+                {
+                    'event_id': event['id'],
+                    'date': current_day,
+                    'summary': event['title'],
+                    'title': event['title'],
+                    'start_time': None,
+                    'all_day': True,
+                    'location': event.get('location') or None,
+                    'audience': 'All',
+                    'notes': event.get('notes') or None,
+                    'source_order': 1,
+                }
+            )
+            current_day += timedelta(days=1)
     return rows
 
 
@@ -749,4 +789,5 @@ def _return_url():
     month = request.form.get('return_month')
     holidays = request.form.get('return_holidays', '1')
     islamic = request.form.get('return_islamic', 'partial')
-    return url_for('calendar.index', year=year, month=month, holidays=holidays, islamic=islamic)
+    usa_jamaat = request.form.get('return_usa_jamaat', '1')
+    return url_for('calendar.index', year=year, month=month, holidays=holidays, islamic=islamic, usa_jamaat=usa_jamaat)

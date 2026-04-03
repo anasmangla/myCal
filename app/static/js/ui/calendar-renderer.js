@@ -1,6 +1,7 @@
 import { buildMonthGrid, isoDate } from '../utils/dates.js';
 import { WEEKDAY_NAMES } from '../core/constants.js';
-import { visibleEventMap } from '../features/events.js';
+import { mergeOccurrenceMaps, visibleEventMap } from '../features/events.js';
+import { visibleUsaJamaatEventMap } from '../features/usa-jamaat.js';
 import { CELL_FONT_PRESET_OPTIONS, CELL_FONT_SIZE_OPTIONS, applyCellTextPresentation, getCellTextStyle } from '../features/cell-editor.js';
 import { previewText, escapeHtml } from '../utils/text.js';
 import { contrastTextColor } from '../utils/colors.js';
@@ -154,7 +155,12 @@ export function renderCalendar({
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const visibleEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-  const events = visibleEventMap(state.doc.events, visibleStart, visibleEnd, audienceColors);
+  const hiddenUsaJamaatOccurrences = new Set(state.doc.settings?.hiddenMeta?.usaJamaatOccurrences || []);
+  const userEvents = visibleEventMap(state.doc.events, visibleStart, visibleEnd, audienceColors);
+  const usaJamaatEvents = state.doc.settings?.showUsaJamaat === false
+    ? {}
+    : visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenUsaJamaatOccurrences);
+  const events = mergeOccurrenceMaps(userEvents, usaJamaatEvents);
   const hiddenHolidayDates = new Set(state.doc.settings?.hiddenMeta?.holidays || []);
   const hiddenIslamicDates = new Set(state.doc.settings?.hiddenMeta?.islamic || []);
   const holidays = state.doc.settings.showUSHolidays ? simpleUSHolidays(year, month) : new Map();
@@ -367,27 +373,31 @@ export function renderCalendar({
         chip.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.sourceEventId) onOpenEvent(item.sourceEventId);
+          if (item.sourceType === 'user' && item.sourceEventId) onOpenEvent(item.sourceEventId);
         });
         chip.addEventListener('dblclick', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.sourceEventId) onOpenEvent(item.sourceEventId);
+          if (item.sourceType === 'user' && item.sourceEventId) onOpenEvent(item.sourceEventId);
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (!item.sourceEventId || item.isHoliday) return;
+          if (item.isHoliday) return;
+          if (item.sourceType === 'user' && !item.sourceEventId) return;
           onEventContext({
             eventId: item.sourceEventId,
+            sourceType: item.sourceType || 'user',
             occurrenceDate: item.occurrenceDate || key,
+            occurrenceKey: item.occurrenceKey || '',
+            title: item.title || item.displayText,
             x: event.pageX,
             y: event.pageY,
           });
         });
-        chip.draggable = Boolean(item.sourceEventId && !item.isHoliday);
+        chip.draggable = Boolean(item.sourceType === 'user' && item.sourceEventId && !item.isHoliday);
         chip.addEventListener('dragstart', (event) => {
-          if (!item.sourceEventId || item.isHoliday) return;
+          if (item.sourceType !== 'user' || !item.sourceEventId || item.isHoliday) return;
           event.dataTransfer.effectAllowed = 'move';
           event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.sourceEventId, anchorDate: item.occurrenceDate || key }));
         });

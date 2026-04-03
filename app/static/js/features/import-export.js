@@ -2,6 +2,7 @@ import { APP_VERSION, SCHEMA_VERSION } from '../core/constants.js';
 import { validateDocument } from '../core/schema.js';
 import { downloadText } from '../utils/dom.js';
 import { isoDate, parseIsoDate } from '../utils/dates.js';
+import { visibleUsaJamaatEventMap } from './usa-jamaat.js';
 
 export function exportDocumentJson(doc) {
   const payload = {
@@ -110,6 +111,27 @@ function buildVisibleOccurrenceRows(doc) {
       });
     }
   });
+
+  if (doc.settings?.showUsaJamaat !== false) {
+    const hiddenKeys = new Set(doc.settings?.hiddenMeta?.usaJamaatOccurrences || []);
+    const usaJamaatMap = visibleUsaJamaatEventMap(visibleStart, visibleEnd, hiddenKeys);
+    Object.entries(usaJamaatMap).forEach(([date, items]) => {
+      items.forEach((item) => {
+        rows.push({
+          eventId: item.occurrenceKey || item.title,
+          date,
+          summary: item.title,
+          title: item.title,
+          startTime: '',
+          allDay: true,
+          location: item.location,
+          notes: item.notes,
+          audience: 'All',
+          visibility: 'public',
+        });
+      });
+    });
+  }
 
   rows.sort((left, right) => {
     const leftTime = left.allDay ? '' : (left.startTime || '99:99');

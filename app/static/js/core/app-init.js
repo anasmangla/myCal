@@ -18,7 +18,7 @@ import { searchDocument } from '../features/search.js';
 
 let eventModal;
 let activeDateContext = '';
-let activeEventContext = { eventId: '', occurrenceDate: '' };
+let activeEventContext = { eventId: '', occurrenceDate: '', sourceType: 'user', occurrenceKey: '', title: '' };
 let pendingCellEditorFocus = false;
 let activeDraggedCellImage = null;
 const FONT_PRESETS = {
@@ -178,6 +178,7 @@ function rerender() {
   document.getElementById('monthYearSelect').value = `${appState.view.year}-${String(appState.view.month).padStart(2, '0')}`;
   document.getElementById('islamicToggle').checked = appState.doc.settings.showIslamicDates;
   document.getElementById('holidaysToggle').checked = appState.doc.settings.showUSHolidays;
+  document.getElementById('usaJamaatToggle').checked = appState.doc.settings.showUsaJamaat !== false;
   renderCalendar({
     state: appState,
     audienceColors: mergedAudienceColors(),
@@ -215,8 +216,9 @@ function rerender() {
       updateDateContextLabels(date);
       showMenu(document.getElementById('dateContextMenu'), x, y);
     },
-    onEventContext: ({ eventId, occurrenceDate, x, y }) => {
-      activeEventContext = { eventId, occurrenceDate };
+    onEventContext: ({ eventId, occurrenceDate, sourceType, occurrenceKey, title, x, y }) => {
+      activeEventContext = { eventId, occurrenceDate, sourceType: sourceType || 'user', occurrenceKey: occurrenceKey || '', title: title || '' };
+      updateEventContextLabels();
       showMenu(document.getElementById('eventContextMenu'), x, y);
     },
     onMoveEvent: ({ eventId, targetDate, anchorDate }) => moveEvent(eventId, targetDate, anchorDate),
@@ -422,6 +424,16 @@ function updateDateContextLabels(date) {
   islamicBtn.disabled = !inVisibleMonth || !appState.doc.settings.showIslamicDates;
 }
 
+function updateEventContextLabels() {
+  const modifyBtn = document.getElementById('contextModifyEvent');
+  const moveBtn = document.getElementById('contextMoveEvent');
+  const deleteBtn = document.getElementById('contextDeleteEvent');
+  const isUsaJamaat = activeEventContext.sourceType === 'usa-jamaat';
+  modifyBtn.classList.toggle('d-none', isUsaJamaat);
+  moveBtn.classList.toggle('d-none', isUsaJamaat);
+  deleteBtn.textContent = isUsaJamaat ? 'Hide USA Jamaat event on this day' : 'Remove event';
+}
+
 function toggleHiddenDate(type, date) {
   if (!date) return;
   const values = hiddenDateSet(type);
@@ -601,6 +613,11 @@ function bindMainUI() {
 
   document.getElementById('holidaysToggle').addEventListener('change', (e) => {
     appState.doc.settings.showUSHolidays = e.target.checked;
+    schedulePersist(appState.doc, 'settings', setLastSaved);
+    rerender();
+  });
+  document.getElementById('usaJamaatToggle').addEventListener('change', (e) => {
+    appState.doc.settings.showUsaJamaat = e.target.checked;
     schedulePersist(appState.doc, 'settings', setLastSaved);
     rerender();
   });
@@ -814,7 +831,14 @@ function bindMainUI() {
   });
   document.getElementById('contextDeleteEvent').addEventListener('click', () => {
     hideMenus();
-    const { eventId } = activeEventContext;
+    const { eventId, sourceType, occurrenceKey } = activeEventContext;
+    if (sourceType === 'usa-jamaat') {
+      if (!occurrenceKey) return;
+      toggleHiddenDate('usaJamaatOccurrences', occurrenceKey);
+      schedulePersist(appState.doc, 'usa-jamaat-hide', setLastSaved);
+      rerender();
+      return;
+    }
     if (!eventId) return;
     appState.doc.events = appState.doc.events.filter((item) => item.id !== eventId);
     schedulePersist(appState.doc, 'event-delete', setLastSaved);

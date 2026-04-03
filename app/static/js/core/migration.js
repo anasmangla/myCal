@@ -10,8 +10,10 @@ export function migrateLegacyState({ legacyRaw, month, docId, title }) {
 
   doc.settings.showUSHolidays = legacy.includeHolidays !== false;
   doc.settings.showIslamicDates = legacy.includeIslamic !== false;
+  doc.settings.showUsaJamaat = legacy.includeUsaJamaat !== false;
   doc.settings.hiddenMeta.holidays = legacy.hiddenMeta?.holidays || [];
   doc.settings.hiddenMeta.islamic = legacy.hiddenMeta?.islamic || [];
+  doc.settings.hiddenMeta.usaJamaatOccurrences = legacy.hiddenMeta?.usaJamaatOccurrences || [];
 
   (legacy.events || []).forEach((event) => doc.events.push(normalizeEvent(event)));
   Object.entries(legacy.styles || {}).forEach(([date, color]) => {

@@ -70,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDate = null;
   let activeEventId = null;
   let activeEventOccurrenceDate = null;
+  let activeEventSourceType = 'user';
+  let activeEventOccurrenceKey = '';
+  let activeEventTitle = '';
   const hiddenMeta = loadHiddenMeta();
   const defaultThemeSettings = {
     outsideMonthColor: '#f5f5f5',
@@ -101,11 +104,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearSelectedEvent() {
     activeEventId = null;
     activeEventOccurrenceDate = null;
+    activeEventSourceType = 'user';
+    activeEventOccurrenceKey = '';
+    activeEventTitle = '';
   }
 
-  function selectEvent(eventId, occurrenceDate) {
+  function selectEvent({ eventId = null, occurrenceDate = '', sourceType = 'user', occurrenceKey = '', title = '' } = {}) {
     activeEventId = eventId;
     activeEventOccurrenceDate = occurrenceDate;
+    activeEventSourceType = sourceType;
+    activeEventOccurrenceKey = occurrenceKey;
+    activeEventTitle = title;
   }
 
   document.querySelectorAll('.date-action-btn').forEach((button) => {
@@ -134,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         event.stopPropagation();
         const sourceEventId = Number(eventChip.dataset.sourceEventId);
-        selectEvent(sourceEventId, activeDate);
+        selectEvent({ eventId: sourceEventId, occurrenceDate: activeDate, sourceType: 'user', occurrenceKey: `event-${sourceEventId}@${activeDate}` });
         await openEventById(sourceEventId);
         return;
       }
@@ -147,7 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const firstEvent = dateItems.find((item) => item.source_event_id && !item.is_holiday);
       if (firstEvent) {
         event.preventDefault();
-        selectEvent(firstEvent.source_event_id, activeDate);
+        selectEvent({
+          eventId: firstEvent.source_event_id,
+          occurrenceDate: activeDate,
+          sourceType: firstEvent.source_type || 'user',
+          occurrenceKey: firstEvent.occurrence_key || `event-${firstEvent.source_event_id}@${activeDate}`,
+          title: firstEvent.title || '',
+        });
         await openEventById(firstEvent.source_event_id);
         return;
       }
@@ -198,6 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('contextDeleteEvent').addEventListener('click', async () => {
     hideMenus();
+    if (activeEventSourceType === 'usa-jamaat') {
+      if (!activeEventOccurrenceKey) return;
+      toggleHiddenMeta('usaJamaatOccurrences', activeEventOccurrenceKey);
+      renderCalendarDecorations();
+      return;
+    }
     await submitDeleteEvent(activeEventId, activeEventOccurrenceDate);
   });
 
@@ -284,10 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
       container.innerHTML = '';
       items.forEach((item) => {
         if (item.is_holiday && isHiddenMeta('holidays', date)) return;
+        if (item.is_usa_jamaat && item.occurrence_key && isHiddenMeta('usaJamaatOccurrences', item.occurrence_key)) return;
         const chip = document.createElement('a');
         chip.className = `event-chip ${item.is_holiday ? 'holiday-chip' : ''}`;
         chip.textContent = item.display_text;
-        chip.style.backgroundColor = item.uses_custom_color ? item.color : colorForAudience(item.audience);
+        chip.style.backgroundColor = (item.uses_custom_color || item.is_holiday || item.is_usa_jamaat)
+          ? item.color
+          : colorForAudience(item.audience);
         chip.href = '#';
         if (item.source_event_id) {
           chip.dataset.sourceEventId = String(item.source_event_id);
@@ -297,26 +321,53 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.addEventListener('click', async (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.is_holiday || !item.source_event_id) return;
-          selectEvent(item.source_event_id, date);
+          if (item.is_holiday || !item.source_event_id || item.source_type !== 'user') return;
+          selectEvent({
+            eventId: item.source_event_id,
+            occurrenceDate: date,
+            sourceType: item.source_type || 'user',
+            occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            title: item.title || '',
+          });
           await openEventById(item.source_event_id);
         });
         chip.addEventListener('dblclick', async (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (item.is_holiday || !item.source_event_id) return;
-          selectEvent(item.source_event_id, date);
+          if (item.is_holiday || !item.source_event_id || item.source_type !== 'user') return;
+          selectEvent({
+            eventId: item.source_event_id,
+            occurrenceDate: date,
+            sourceType: item.source_type || 'user',
+            occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            title: item.title || '',
+          });
           await openEventById(item.source_event_id);
         });
         chip.addEventListener('contextmenu', (event) => {
           event.preventDefault();
-          if (item.is_holiday || !item.source_event_id) return;
-          selectEvent(item.source_event_id, date);
+          event.stopPropagation();
+          if (item.is_holiday) return;
+          if (item.source_type === 'user' && !item.source_event_id) return;
+          selectEvent({
+            eventId: item.source_event_id || null,
+            occurrenceDate: date,
+            sourceType: item.source_type || 'user',
+            occurrenceKey: item.occurrence_key || '',
+            title: item.title || '',
+          });
+          syncEventMenuLabels();
           showMenu(eventMenu, event.pageX, event.pageY);
         });
         chip.addEventListener('dragstart', (event) => {
-          if (item.is_holiday || !item.source_event_id) return;
-          selectEvent(item.source_event_id, date);
+          if (item.is_holiday || !item.source_event_id || item.source_type !== 'user') return;
+          selectEvent({
+            eventId: item.source_event_id,
+            occurrenceDate: date,
+            sourceType: item.source_type || 'user',
+            occurrenceKey: item.occurrence_key || `event-${item.source_event_id}@${date}`,
+            title: item.title || '',
+          });
           event.dataTransfer.setData('text/plain', JSON.stringify({ eventId: item.source_event_id, anchorDate: date }));
           event.dataTransfer.effectAllowed = 'move';
           chip.classList.add('is-dragging');
@@ -411,13 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('contextModifyEvent').addEventListener('click', async () => {
     hideMenus();
-    if (!activeEventId) return;
+    if (activeEventSourceType !== 'user' || !activeEventId) return;
     await openEventById(activeEventId);
   });
 
   document.getElementById('contextMoveEvent').addEventListener('click', () => {
     hideMenus();
-    if (!activeEventId) return;
+    if (activeEventSourceType !== 'user' || !activeEventId) return;
 
     const defaultDate = activeEventOccurrenceDate || '';
     const nextStart = window.prompt('Move event to start on (YYYY-MM-DD):', defaultDate);
@@ -1065,9 +1116,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const parsed = raw ? JSON.parse(raw) : {};
       const holidays = Array.isArray(parsed.holidays) ? parsed.holidays.filter((value) => typeof value === 'string') : [];
       const islamic = Array.isArray(parsed.islamic) ? parsed.islamic.filter((value) => typeof value === 'string') : [];
-      return { holidays: new Set(holidays), islamic: new Set(islamic) };
+      const usaJamaatOccurrences = Array.isArray(parsed.usaJamaatOccurrences)
+        ? parsed.usaJamaatOccurrences.filter((value) => typeof value === 'string')
+        : [];
+      return { holidays: new Set(holidays), islamic: new Set(islamic), usaJamaatOccurrences: new Set(usaJamaatOccurrences) };
     } catch (error) {
-      return { holidays: new Set(), islamic: new Set() };
+      return { holidays: new Set(), islamic: new Set(), usaJamaatOccurrences: new Set() };
     }
   }
 
@@ -1075,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const payload = {
       holidays: Array.from(hiddenMeta.holidays),
       islamic: Array.from(hiddenMeta.islamic),
+      usaJamaatOccurrences: Array.from(hiddenMeta.usaJamaatOccurrences),
     };
     window.localStorage.setItem(hiddenMetaStorageKey(), JSON.stringify(payload));
   }
@@ -1106,6 +1161,18 @@ document.addEventListener('DOMContentLoaded', () => {
     islamicButton.disabled = !selectableDate || !hasIslamic;
     holidayButton.textContent = holidayHidden ? 'Show U.S. holiday on this day' : 'Hide U.S. holiday on this day';
     islamicButton.textContent = islamicHidden ? 'Show Islamic date on this day' : 'Hide Islamic date on this day';
+  }
+
+  function syncEventMenuLabels() {
+    const modifyButton = document.getElementById('contextModifyEvent');
+    const moveButton = document.getElementById('contextMoveEvent');
+    const deleteButton = document.getElementById('contextDeleteEvent');
+    const isUsaJamaat = activeEventSourceType === 'usa-jamaat';
+    modifyButton.classList.toggle('d-none', isUsaJamaat);
+    moveButton.classList.toggle('d-none', isUsaJamaat);
+    deleteButton.textContent = isUsaJamaat
+      ? `Hide USA Jamaat event on ${activeEventOccurrenceDate || 'this day'}`
+      : 'Remove event';
   }
 
   function renderCalendarDecorations() {

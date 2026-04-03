@@ -13,7 +13,8 @@ export function makeEmptyDocument({ docId, month, title }) {
     settings: {
       showIslamicDates: true,
       showUSHolidays: true,
-      hiddenMeta: { holidays: [], islamic: [] },
+      showUsaJamaat: true,
+      hiddenMeta: { holidays: [], islamic: [], usaJamaatOccurrences: [] },
       shareDefaults: { includePrivateItems: false, includeImages: true, includeNotes: true },
     },
     events: [],

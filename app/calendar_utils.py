@@ -8,6 +8,7 @@ from datetime import date, time, timedelta
 import holidays
 
 from .models import DateStyle, Event
+from .usa_jamaat_calendar import USA_JAMAAT_COLOR, usa_jamaat_events_for_month
 
 AUDIENCE_COLORS = {
     'Lajna': '#b03060',
@@ -65,6 +66,9 @@ class Occurrence:
     notes: str | None
     is_holiday: bool = False
     uses_custom_color: bool = False
+    source_type: str = 'user'
+    occurrence_key: str | None = None
+    is_usa_jamaat: bool = False
 
 
 @dataclass
@@ -159,6 +163,8 @@ def build_occurrence(event: Event, current_day: date, label: str) -> Occurrence:
         location=event.location,
         notes=event.notes,
         uses_custom_color=bool(event.color),
+        source_type='user',
+        occurrence_key=f'event-{event.id}@{current_day.isoformat()}',
     )
 
 
@@ -230,13 +236,53 @@ def holiday_occurrence(holiday_day: date, name: str) -> Occurrence:
         location=None,
         notes=HOLIDAY_NOTE,
         is_holiday=True,
+        source_type='holiday',
+        occurrence_key=f'holiday@{holiday_day.isoformat()}',
     )
+
+
+def usa_jamaat_occurrence(event: dict, current_day: date) -> Occurrence:
+    occurrence_key = f"{event['id']}@{current_day.isoformat()}"
+    return Occurrence(
+        event_id=occurrence_key,
+        source_event_id=None,
+        date=current_day,
+        title=event['title'],
+        label=event['title'],
+        display_text=event['title'],
+        start_time=None,
+        end_time=None,
+        all_day=True,
+        audience=event.get('audience') or 'All',
+        color=USA_JAMAAT_COLOR,
+        location=event.get('location') or None,
+        notes=event.get('notes') or None,
+        source_type='usa-jamaat',
+        occurrence_key=occurrence_key,
+        is_usa_jamaat=True,
+    )
+
+
+def sort_occurrences(grouped: dict[date, list[Occurrence]]) -> dict[date, list[Occurrence]]:
+    for items in grouped.values():
+        items.sort(
+            key=lambda item: (
+                0 if item.is_holiday else 1 if item.is_usa_jamaat else 2,
+                not item.all_day,
+                item.start_time or '99:99',
+                item.title,
+                item.event_id,
+            )
+        )
+    return grouped
 
 
 def serialize_occurrence(item: Occurrence) -> dict:
     return {
         'event_id': item.event_id,
         'source_event_id': item.source_event_id,
+        'source_type': item.source_type,
+        'occurrence_key': item.occurrence_key,
         'date': item.date.isoformat(),
         'title': item.title,
         'label': item.label,
@@ -249,6 +295,7 @@ def serialize_occurrence(item: Occurrence) -> dict:
         'location': item.location,
         'notes': item.notes,
         'is_holiday': item.is_holiday,
+        'is_usa_jamaat': item.is_usa_jamaat,
         'uses_custom_color': item.uses_custom_color,
     }
 
@@ -266,7 +313,7 @@ def load_date_styles() -> dict[str, str]:
     return {style.day.isoformat(): style.background_color for style in DateStyle.query.all()}
 
 
-def month_context(year: int, month: int, include_holidays: bool) -> dict:
+def month_context(year: int, month: int, include_holidays: bool, include_usa_jamaat: bool = True) -> dict:
     start, end = month_bounds(year, month)
     grid = build_month_grid(year, month)
     weeks = build_week_metadata(grid, month)
@@ -277,10 +324,19 @@ def month_context(year: int, month: int, include_holidays: bool) -> dict:
     styles = load_date_styles()
     events = Event.query.filter(Event.end_date >= visible_start, Event.start_date <= visible_end).all()
     occurrences = expand_event_occurrences(events, visible_start, visible_end)
+    if include_usa_jamaat:
+        for item in usa_jamaat_events_for_month(visible_start, visible_end):
+            current_day = max(item['start_date'], visible_start)
+            final_day = min(item['end_date'], visible_end)
+            while current_day <= final_day:
+                occurrences.setdefault(current_day, []).append(usa_jamaat_occurrence(item, current_day))
+                current_day += timedelta(days=1)
 
     if include_holidays:
         for holiday_day, name in holiday_map.items():
             occurrences.setdefault(holiday_day, []).insert(0, holiday_occurrence(holiday_day, name))
+
+    sort_occurrences(occurrences)
 
     return {
         'month_start': start,
