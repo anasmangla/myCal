@@ -266,31 +266,57 @@
           </div>
           <div class="modal-body">
             <div class="help-grid">
-              <section class="help-card">
-                <h6>Calendar Basics</h6>
+              <section class="help-card help-card-wide">
+                <h6>Quick Start</h6>
+                <p class="small text-muted mb-2">Use this as a monthly planning board for events, notes, built-in faith/community dates, and printable sharing.</p>
                 <ul class="help-list">
-                  <li>Use the month selector at the top to switch months.</li>
-                  <li>Use the `Islamic dates` and `U.S. holidays` toggles to show or hide those labels.</li>
-                  <li>Use the `USA Jamaat` toggle to show or hide the built-in national Jamaat calendar feed for the selected month.</li>
-                  <li>Click the month title to rename the calendar for that month.</li>
-                  <li>Use `Settings` to change colors, fonts, title sizing, and audience colors.</li>
+                  <li>Choose the month from the selector at the top of the page.</li>
+                  <li>Leave <code>USA Jamaat</code>, <code>Islamic dates</code>, and <code>U.S. holidays</code> on or off depending on what you want to display.</li>
+                  <li>Double-click any in-month date cell to add an event.</li>
+                  <li>Double-click any non-date box to type notes directly into that box.</li>
+                  <li>Open <code>Settings</code> to adjust colors, fonts, sizes, and audience colors.</li>
+                  <li>Use <code>Print / Save PDF</code>, <code>Export image</code>, <code>Export ICS</code>, or <code>Export JSON</code> when you are ready to share or back up the month.</li>
                 </ul>
               </section>
               <section class="help-card">
-                <h6>Adding Events</h6>
+                <h6>Top Bar And Toggles</h6>
+                <ul class="help-list">
+                  <li>The month selector changes the active calendar month and updates the page title and browser tab title.</li>
+                  <li><code>Settings</code> controls calendar colors, grid lines, typography, and audience chip colors.</li>
+                  <li><code>USA Jamaat</code> shows or hides the built-in 2026 USA Jamaat feed for the selected month. It is on by default.</li>
+                  <li><code>Islamic dates</code> shows or hides Islamic date labels inside day cells.</li>
+                  <li><code>U.S. holidays</code> shows or hides federal holidays.</li>
+                  <li><code>Reset saved data</code> clears the browser-saved month data for the static app.</li>
+                </ul>
+              </section>
+              <section class="help-card">
+                <h6>USA Jamaat Calendar</h6>
+                <ul class="help-list">
+                  <li>The USA Jamaat events come from the built-in 2026 national Jamaat calendar data saved with the app.</li>
+                  <li>Only the events that fall within the currently selected month are shown.</li>
+                  <li>These Jamaat items are read-only feed entries, not normal user-created events.</li>
+                  <li>Right-click a USA Jamaat event chip and choose remove to hide that occurrence on that day.</li>
+                  <li>Hidden Jamaat occurrences are stored locally for that month on your current browser.</li>
+                  <li>Turn the <code>USA Jamaat</code> toggle off if you want to hide the full Jamaat feed for the selected month.</li>
+                </ul>
+              </section>
+              <section class="help-card">
+                <h6>Working With Events</h6>
                 <ul class="help-list">
                   <li>Double-click a regular in-month date cell to add an event quickly.</li>
-                  <li>Click an event chip to edit it.</li>
-                  <li>Leave `Start time` blank if the event should be treated as all-day.</li>
+                  <li>Leave <code>Start time</code> blank if the event should be treated as all-day.</li>
                   <li>Use the weekday checkboxes in the event form to repeat an event weekly.</li>
+                  <li>Click or double-click one of your own event chips to edit it.</li>
+                  <li>Drag one of your own event chips to another in-month day cell to move it.</li>
+                  <li>Use short titles and optional notes/location so chips stay readable in the calendar grid.</li>
                 </ul>
               </section>
               <section class="help-card">
                 <h6>Right-Click Actions</h6>
                 <ul class="help-list">
                   <li>Right-click a date cell to change its background color or hide holiday / Islamic labels for that day.</li>
-                  <li>Right-click an event chip to modify, move, or remove that event.</li>
-                  <li>Right-click a USA Jamaat event chip to hide that occurrence from the selected day.</li>
+                  <li>Right-click one of your own event chips to modify, move, or remove that event.</li>
+                  <li>Right-click a USA Jamaat event chip to hide only that day's occurrence.</li>
                   <li>Right-click a non-date box image to remove just that image.</li>
                   <li>Right-click a non-date box itself to add or clear images for that box.</li>
                 </ul>
@@ -301,7 +327,8 @@
                   <li>Double-click a non-date box to type directly inside the box.</li>
                   <li>Use the inline controls to change font family, font size, bold, and italic.</li>
                   <li>Text wraps automatically and stays inside the box with scroll support for longer notes.</li>
-                  <li>Click outside the editor or press `Esc` to stop editing.</li>
+                  <li>Click outside the editor or press <code>Esc</code> to stop editing.</li>
+                  <li>These boxes work well for reminders, dua lists, contact notes, or overflow information that does not belong on a specific date.</li>
                 </ul>
               </section>
               <section class="help-card">
@@ -316,27 +343,31 @@
               <section class="help-card">
                 <h6>Export And Sharing</h6>
                 <ul class="help-list">
-                  <li>`Print / Save PDF` creates a printable month view.</li>
-                  <li>`Export image` saves the visible calendar as an image.</li>
-                  <li>`Export ICS` downloads the events that appear in the current month.</li>
-                  <li>`Export JSON` and `Import JSON` let you back up or restore the month data.</li>
+                  <li><code>Print / Save PDF</code> creates a printable month snapshot.</li>
+                  <li><code>Export image</code> saves the visible calendar as an image.</li>
+                  <li><code>Export ICS</code> downloads the events visible in the current month, including USA Jamaat events when that toggle is on.</li>
+                  <li>An ICS file is a snapshot export. If you change the calendar later, recipients will need a new file to get the updated month.</li>
+                  <li><code>Export JSON</code> and <code>Import JSON</code> let you back up or restore the saved month data.</li>
                 </ul>
               </section>
               <section class="help-card">
                 <h6>Saved Data</h6>
                 <ul class="help-list">
                   <li>Your static calendar changes are saved locally in the browser.</li>
-                  <li>`Reset saved data` clears the saved local month data for the static app.</li>
+                  <li>Font settings, colors, hidden labels, and hidden USA Jamaat occurrences are also saved locally.</li>
+                  <li><code>Reset saved data</code> clears the saved local month data for the static app.</li>
                   <li>If you import JSON, the imported month replaces the current loaded document.</li>
+                  <li>If browser storage is cleared or you switch devices, local static data does not follow automatically.</li>
                 </ul>
               </section>
               <section class="help-card">
-                <h6>Best Practices</h6>
+                <h6>Helpful Tips</h6>
                 <ul class="help-list">
                   <li>Keep event titles short so they fit better in printed cells.</li>
                   <li>Use audience colors consistently so readers can scan quickly.</li>
                   <li>Use non-date boxes for overflow notes, reminders, contacts, or announcements.</li>
-                  <li>Export a PDF or image before sharing if you want recipients to see exactly what you see.</li>
+                  <li>Use PDF or image export when you want recipients to see the exact visual layout.</li>
+                  <li>Use ICS when you want recipients to import the visible month's events into another calendar app.</li>
                 </ul>
               </section>
             </div>
