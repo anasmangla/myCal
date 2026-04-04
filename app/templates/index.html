@@ -479,6 +479,24 @@
   <button class="dropdown-item" id="contextMoveEvent">Move event</button>
   <button class="dropdown-item text-danger" id="contextDeleteEvent">Remove event</button>
 </div>
+<div class="modal fade" id="deleteScopeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete recurring event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="deleteScopeModalMessage">Choose what you want to delete.</p>
+      </div>
+      <div class="modal-footer d-flex flex-wrap justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary" id="deleteScopeCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-outline-danger" id="deleteScopeSingleBtn">Delete this</button>
+        <button type="button" class="btn btn-danger" id="deleteScopeAllBtn">Delete all</button>
+      </div>
+    </div>
+  </div>
+</div>
 <form method="post" id="deleteEventForm" class="d-none">
   <input type="hidden" name="return_year" value="{{ selected_year }}">
   <input type="hidden" name="return_month" value="{{ selected_month }}">

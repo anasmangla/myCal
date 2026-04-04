@@ -45,6 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const dateMenu = document.getElementById('dateContextMenu');
   const eventMenu = document.getElementById('eventContextMenu');
   const colorPicker = document.getElementById('dateColorPicker');
+  const deleteScopeModalEl = document.getElementById('deleteScopeModal');
+  const deleteScopeModal = deleteScopeModalEl ? new bootstrap.Modal(deleteScopeModalEl) : null;
+  const deleteScopeModalMessage = document.getElementById('deleteScopeModalMessage');
+  const deleteScopeSingleBtn = document.getElementById('deleteScopeSingleBtn');
+  const deleteScopeAllBtn = document.getElementById('deleteScopeAllBtn');
+  const deleteScopeCancelBtn = document.getElementById('deleteScopeCancelBtn');
   const deleteForm = document.getElementById('deleteEventForm');
   const deleteModeInput = document.getElementById('deleteMode');
   const deleteOccurrenceDateInput = document.getElementById('deleteOccurrenceDate');
@@ -661,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideMenus();
     if (activeEventSourceType === 'usa-jamaat') {
       if (!activeEventOccurrenceKey) return;
-      const deleteMode = activeEventSeriesSpanDays > 1 ? askDeleteMode(false) : 'single';
+      const deleteMode = activeEventSeriesSpanDays > 1 ? await askDeleteMode(false) : 'single';
       if (!deleteMode) return;
       if (deleteMode === 'all' && activeEventSeriesKey) {
         toggleHiddenMeta('usaJamaatSeries', activeEventSeriesKey);
@@ -1779,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
     const isMultiDay = getSpanDays(details.start_date, details.end_date) > 1;
-    const deleteMode = (isRecurring || isMultiDay) ? askDeleteMode(isRecurring) : 'all';
+    const deleteMode = (isRecurring || isMultiDay) ? await askDeleteMode(isRecurring) : 'all';
     if (!deleteMode) return;
 
     deleteModeInput.value = deleteMode;
@@ -1810,15 +1816,54 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function askDeleteMode(isRecurring = false) {
-    const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
-    const deleteOne = window.confirm(
-      `${intro}\n\nChoose an option:\n• OK = Delete only this date.\n• Cancel = See options for deleting the full series or cancel completely.`
-    );
-    if (deleteOne) return 'single';
-    const deleteAll = window.confirm(
-      'Delete the entire series?\n\n• OK = Delete entire series.\n• Cancel = Do not delete anything.'
-    );
-    return deleteAll ? 'all' : '';
+    if (!deleteScopeModal || !deleteScopeSingleBtn || !deleteScopeAllBtn || !deleteScopeCancelBtn || !deleteScopeModalMessage) {
+      const fallbackMessage = isRecurring
+        ? 'Delete this occurrence only? Click Cancel to choose deleting all or to cancel.'
+        : 'Delete this date only? Click Cancel to choose deleting all or to cancel.';
+      const deleteOne = window.confirm(fallbackMessage);
+      if (deleteOne) return Promise.resolve('single');
+      const deleteAll = window.confirm('Delete all dates in this event series?');
+      return Promise.resolve(deleteAll ? 'all' : '');
+    }
+
+    deleteScopeModalMessage.textContent = isRecurring
+      ? 'This event repeats. Choose exactly what you want to remove.'
+      : 'This event spans multiple dates. Choose exactly what you want to remove.';
+
+    return new Promise((resolve) => {
+      let finished = false;
+      const done = (value) => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        resolve(value);
+      };
+      const onSingle = () => {
+        deleteScopeModal.hide();
+        done('single');
+      };
+      const onAll = () => {
+        deleteScopeModal.hide();
+        done('all');
+      };
+      const onCancel = () => {
+        deleteScopeModal.hide();
+        done('');
+      };
+      const onHidden = () => done('');
+      const cleanup = () => {
+        deleteScopeSingleBtn.removeEventListener('click', onSingle);
+        deleteScopeAllBtn.removeEventListener('click', onAll);
+        deleteScopeCancelBtn.removeEventListener('click', onCancel);
+        deleteScopeModalEl.removeEventListener('hidden.bs.modal', onHidden);
+      };
+
+      deleteScopeSingleBtn.addEventListener('click', onSingle);
+      deleteScopeAllBtn.addEventListener('click', onAll);
+      deleteScopeCancelBtn.addEventListener('click', onCancel);
+      deleteScopeModalEl.addEventListener('hidden.bs.modal', onHidden);
+      deleteScopeModal.show();
+    });
   }
 
   function hiddenMetaStorageKey() {
