@@ -168,6 +168,15 @@ function parseDragPayload(value) {
   }
 }
 
+function splitMultiDayLabel(displayText = '') {
+  const match = /^Day\s+(\d+)\s*:\s*(.+)$/i.exec(String(displayText).trim());
+  if (!match) return null;
+  return {
+    dayNumber: match[1],
+    title: match[2],
+  };
+}
+
 export function renderCalendar({
   state,
   audienceColors,
@@ -426,8 +435,17 @@ export function renderCalendar({
         const chip = document.createElement('a');
         chip.href = '#';
         chip.className = `event-chip ${item.isHoliday ? 'holiday-chip' : ''} ${item.isUsaJamaat ? 'usa-jamaat-chip' : ''}`.trim();
+        if ((item.seriesSpanDays || 1) > 1) chip.classList.add('multi-day-event-chip');
         chip.style.backgroundColor = item.color;
-        chip.textContent = item.displayText;
+        const multiDayLabel = splitMultiDayLabel(item.displayText);
+        if (multiDayLabel && (item.seriesSpanDays || 1) > 1) {
+          chip.innerHTML = `
+            <span class="chip-ribbon-day">Day ${escapeHtml(multiDayLabel.dayNumber)}</span>
+            <span class="chip-ribbon-title">${escapeHtml(multiDayLabel.title)}</span>
+          `;
+        } else {
+          chip.textContent = item.displayText;
+        }
         chip.title = item.title || item.displayText;
         chip.addEventListener('click', (event) => {
           event.preventDefault();
