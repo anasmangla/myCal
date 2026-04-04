@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
-USA_JAMAAT_COLOR = '#0f766e'
+USA_JAMAAT_COLOR = '#f97316'
 DATA_FILE = Path(__file__).resolve().parent / 'static' / 'data' / 'usa-jamaat-calendar-2026.json'
 
 
