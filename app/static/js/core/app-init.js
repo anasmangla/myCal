@@ -1024,10 +1024,12 @@ function askSeriesDeleteMode(event) {
   const isRecurring = event.recurrenceType && event.recurrenceType !== 'none';
   const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
   const deleteSelectedDate = window.confirm(
-    `${intro}\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.`
+    `${intro}\n\nChoose an option:\n• OK = Delete only this date.\n• Cancel = See options for deleting the full series or cancel completely.`
   );
   if (deleteSelectedDate) return 'single';
-  const deleteSeries = window.confirm('Delete the entire series?');
+  const deleteSeries = window.confirm(
+    'Delete the entire series?\n\n• OK = Delete entire series.\n• Cancel = Do not delete anything.'
+  );
   return deleteSeries ? 'all' : '';
 }
 

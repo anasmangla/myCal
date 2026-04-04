@@ -392,10 +392,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRecurring = details.recurrence_type && details.recurrence_type !== 'none';
     const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
     const affectSelectedDate = window.confirm(
-      `${intro}\n\nPress OK to ${actionVerb} only the selected date.\nPress Cancel to choose whether to ${actionVerb} the entire series.`
+      `${intro}\n\nChoose an option:\n• OK = ${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} only this date.\n• Cancel = See options for the full series or cancel completely.`
     );
     if (affectSelectedDate) return 'single';
-    const affectSeries = window.confirm(`${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} the entire series?`);
+    const affectSeries = window.confirm(
+      `${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} the entire series?\n\n• OK = ${actionVerb.charAt(0).toUpperCase()}${actionVerb.slice(1)} entire series.\n• Cancel = Do nothing.`
+    );
     return affectSeries ? 'all' : '';
   }
 
@@ -1810,10 +1812,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function askDeleteMode(isRecurring = false) {
     const intro = isRecurring ? 'This is a recurring event.' : 'This is a multi-day event.';
     const deleteOne = window.confirm(
-      `${intro}\n\nPress OK to delete only the selected date.\nPress Cancel to choose whether to delete the entire series.`
+      `${intro}\n\nChoose an option:\n• OK = Delete only this date.\n• Cancel = See options for deleting the full series or cancel completely.`
     );
     if (deleteOne) return 'single';
-    const deleteAll = window.confirm('Delete the entire series?');
+    const deleteAll = window.confirm(
+      'Delete the entire series?\n\n• OK = Delete entire series.\n• Cancel = Do not delete anything.'
+    );
     return deleteAll ? 'all' : '';
   }
 
