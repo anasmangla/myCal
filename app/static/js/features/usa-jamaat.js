@@ -2,7 +2,7 @@ import { USA_JAMAAT_EVENTS_2026 } from '../data/usa-jamaat-calendar-2026.js';
 import { isoDate, parseIsoDate } from '../utils/dates.js';
 import { sortOccurrenceItems } from './events.js';
 
-export const USA_JAMAAT_COLOR = '#f97316';
+export const USA_JAMAAT_COLOR = '#fff7ed';
 
 export function usaJamaatOccurrenceKey(eventId, occurrenceDate) {
   return `${eventId}@${occurrenceDate}`;
