@@ -437,6 +437,10 @@ export function renderCalendar({
         chip.className = `event-chip ${item.isHoliday ? 'holiday-chip' : ''} ${item.isUsaJamaat ? 'usa-jamaat-chip' : ''}`.trim();
         if ((item.seriesSpanDays || 1) > 1) chip.classList.add('multi-day-event-chip');
         chip.style.backgroundColor = item.color;
+        // Apply to both saved and newly imported Tahir Academy entries.
+        if (String(item.sourceEventId || '').startsWith('buffalo-tahir-2026-2027-')) {
+          chip.style.color = '#003366';
+        }
         const multiDayLabel = splitMultiDayLabel(item.displayText);
         if (multiDayLabel && (item.seriesSpanDays || 1) > 1) {
           chip.innerHTML = `
