@@ -1,3 +1,4 @@
+import { addTahirAcademySchedule } from '../data/tahir-academy-2026-2027.js';
 import { MONTH_NAMES, WEEKDAY_NAMES, AUDIENCE_CHOICES, AUDIENCE_COLORS, LEGACY_STORAGE_KEY, TITLE_STORAGE_PREFIX } from './constants.js';
 import { appState, pushUndo } from './state.js';
 import { firstVisibleMonth, monthIso } from '../utils/dates.js';
@@ -1228,6 +1229,9 @@ async function loadOrCreateDoc(year, month) {
       doc = createDocumentForView({ year, month, docId: uuid() });
       await persistDocument(doc, 'init');
     }
+  }
+  if (addTahirAcademySchedule(doc)) {
+    await persistDocument(doc, 'tahir-academy-schedule');
   }
   return doc;
 }
