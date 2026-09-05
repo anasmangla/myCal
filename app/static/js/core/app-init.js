@@ -1214,6 +1214,36 @@ function syncRecurrenceTypeFromWeekdays() {
   document.getElementById('recurrenceType').value = selected ? 'weekly' : 'none';
 }
 
+function addQuranClassSchedule(doc) {
+  const marker = 'quranClassZoomSepNov2026';
+  const monthRanges = {
+    '2026-09': ['2026-09-01', '2026-09-29'],
+    '2026-10': ['2026-10-06', '2026-10-27'],
+    '2026-11': ['2026-11-03', '2026-11-24'],
+  };
+  const range = monthRanges[doc.month];
+  if (!range || doc.settings?.[marker]) return false;
+  const id = 'quran-class-zoom-' + doc.month;
+  if (!doc.events.some(event => event.id === id)) {
+    doc.events.push(normalizeEvent({
+      id,
+      title: 'Quran Class',
+      startDate: range[0],
+      endDate: range[1],
+      startTime: '18:45',
+      allDay: false,
+      location: 'Zoom',
+      notes: 'Every Tuesday at 6:45 PM, September–November 2026. Local time: America/New_York. Zoom link and end time not provided.',
+      color: '#003366',
+      recurrenceType: 'weekly',
+      recurrenceWeekdays: ['2'],
+    }));
+  }
+  doc.settings ||= {};
+  doc.settings[marker] = true;
+  return true;
+}
+
 async function loadOrCreateDoc(year, month) {
   const monthValue = monthIso(year, month);
   const meta = getMeta();
@@ -1232,6 +1262,9 @@ async function loadOrCreateDoc(year, month) {
   }
   if (addTahirAcademySchedule(doc)) {
     await persistDocument(doc, 'tahir-academy-schedule');
+  }
+  if (addQuranClassSchedule(doc)) {
+    await persistDocument(doc, 'quran-class-schedule');
   }
   return doc;
 }
